@@ -19,6 +19,7 @@ from src.backend import Backend
 from src.utils.dyn_uncertainty.uncertainty_model import generate_uncertainty_mlp
 from src.utils.datasets import RGB_NoPose
 from src.gui import gui_utils, slam_gui
+from src.utils.mono_priors.img_feature_extractors import get_feature_extractor
 from thirdparty.gaussian_splatting.scene.gaussian_model import GaussianModel
 
 class SLAM:
@@ -43,7 +44,6 @@ class SLAM:
         self.load_pretrained(cfg)
         self.droid_net.to(self.device).eval()
         self.droid_net.share_memory()
-
         self.num_running_thread = torch.zeros((1)).int()
         self.num_running_thread.share_memory_()
         self.all_trigered = torch.zeros((1)).int()
@@ -53,8 +53,12 @@ class SLAM:
             n_features = self.cfg["mapping"]["uncertainty_params"]["feature_dim"]
             self.uncer_network = generate_uncertainty_mlp(n_features)
             self.uncer_network.share_memory()
+
+            self.feat_extractor = get_feature_extractor(self.cfg)
+            self.feat_extractor.share_memory()
         else:
             self.uncer_network = None
+            self.feat_extractor = None
             if self.cfg["tracking"]["uncertainty_params"]["activate"]:
                 raise ValueError(
                     "uncertainty estimation cannot be activated on tracking while not on mapping"
@@ -66,6 +70,7 @@ class SLAM:
         # post processor - fill in poses for non-keyframes
         self.traj_filler = PoseTrajectoryFiller(
             cfg=cfg,
+            feat_extractor=self.feat_extractor,
             net=self.droid_net,
             video=self.video,
             printer=self.printer,
@@ -200,7 +205,6 @@ class SLAM:
         # self._eval_depth_all(ate_statistics, global_scale, r_a, t_a)
 
         # Regenerate feature extractor for non-keyframes
-        self.traj_filler.setup_feature_extractor()
         full_traj_eval(
             self.traj_filler,
             self.mapper,

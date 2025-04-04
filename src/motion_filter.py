@@ -12,7 +12,7 @@ class MotionFilter:
         mainly inherited from DROID-SLAM
     """
 
-    def __init__(self, net, video, cfg, thresh=2.5, device="cuda:0"):
+    def __init__(self, net, feat_extractor, video, cfg, thresh=2.5, device="cuda:0"):
         self.cfg = cfg
         # split net modules
         self.cnet = net.cnet
@@ -34,7 +34,7 @@ class MotionFilter:
         self.metric_depth_estimator = get_metric_depth_estimator(cfg)
         if cfg['mapping']["uncertainty_params"]['activate']:
             # If mapping needs dino features, we still need feature extractor
-            self.feat_extractor = get_feature_extractor(cfg)
+            self.feat_extractor = feat_extractor
 
     @torch.amp.autocast('cuda',enabled=True)
     def __context_encoder(self, image):

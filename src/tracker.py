@@ -19,7 +19,7 @@ class Tracker:
         # filter incoming frames so that there is enough motion
         self.frontend_window = self.cfg['tracking']['frontend']['window']
         filter_thresh = self.cfg['tracking']['motion_filter']['thresh']
-        self.motion_filter = MotionFilter(self.net, self.video, self.cfg, thresh=filter_thresh, device=self.device)
+        self.motion_filter = MotionFilter(self.net, slam.feat_extractor, self.video, self.cfg, thresh=filter_thresh, device=self.device)
         self.enable_online_ba = self.cfg['tracking']['frontend']['enable_online_ba']
         # frontend process
         self.frontend = Frontend(self.net, self.video, self.cfg)

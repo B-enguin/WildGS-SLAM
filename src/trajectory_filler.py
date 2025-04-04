@@ -11,7 +11,7 @@ class PoseTrajectoryFiller:
     """ This class is used to fill in non-keyframe poses 
         mainly inherited from DROID-SLAM
     """
-    def __init__(self, cfg, net, video, printer, device='cuda:0'):
+    def __init__(self, cfg, net, feat_extractor, video, printer, device='cuda:0'):
         self.cfg = cfg
 
         # split net modules
@@ -28,12 +28,9 @@ class PoseTrajectoryFiller:
         self.MEAN = torch.tensor([0.485, 0.456, 0.406], device=device)[:, None, None]
         self.STDV = torch.tensor([0.229, 0.224, 0.225], device=device)[:, None, None]
 
-        self.uncertainty_aware = cfg['tracking']["uncertainty_params"]['activate']        
+        self.uncertainty_aware = cfg['tracking']["uncertainty_params"]['activate']
+        self.feat_extractor = feat_extractor
         
-    def setup_feature_extractor(self):
-        if self.uncertainty_aware:
-            self.feat_extractor = get_feature_extractor(self.cfg)
-
     @torch.amp.autocast('cuda',enabled=True)
     def __feature_encoder(self, image):
         """ features for correlation volume """
