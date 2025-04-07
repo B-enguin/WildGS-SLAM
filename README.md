@@ -112,6 +112,13 @@ Then, run WildGS-SLAM by the following command:
 python run.py  ./configs/Dynamic/Wild_SLAM_Mocap/crowd_demo.yaml
 ```
 
+If you encounter a CUDA out-of-memory error, a quick fix is to lower the image resolution. For example, add the following lines to your ```configs/Dynamic/Wild_SLAM_Mocap/crowd_demo.yaml``` file:
+```bash
+cam:
+  H_out: 240
+  W_out: 400
+```
+
 ## Run
 
 ### Wild-SLAM Mocap Dataset ([🤗 Hugging Face](https://huggingface.co/datasets/gradient-spaces/Wild-SLAM/tree/main))
