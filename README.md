@@ -89,8 +89,7 @@ python -m pip install -e thirdparty/simple-knn/
 ```
 6. Check installation.
 ```bash
-python -c "import torch; import lietorch; import simple_knn; import
-diff_gaussian_rasterization; print(torch.cuda.is_available())"
+python -c "import torch; import lietorch; import simple_knn; import diff_gaussian_rasterization; print(torch.cuda.is_available())"
 ```
 7. Now install the droid backends and the other requirements
 ```bash
@@ -137,7 +136,7 @@ You can run WildGS-SLAM via the following command:
 python run.py  ./configs/Dynamic/Bonn/{config_file} #run a single sequence
 bash scripts_run/run_bonn_all.sh #run all dynamic sequences
 ```
-We have prepared config files for the 8 sequences. Note that this dataset needs preprocess to transform the pose. We have implemented that in the dataloader. If you want to test with sequences other than the ones provided, don't forget to specify ```dataset: 'bonn_dynamic'``` in your config file. The easiest way is to inherit from ```bonn_dynamic.yaml```.
+We have prepared config files for the 8 sequences. Note that this dataset needs preprocessing the pose. We have implemented that in the dataloader. If you want to test with sequences other than the ones provided, don't forget to specify ```dataset: 'bonn_dynamic'``` in your config file. The easiest way is to inherit from ```bonn_dynamic.yaml```.
 
 ### TUM RGB-D (dynamic) Dataset
 Download the data (9 dynamic sequences) as below and the data is saved into the `./Datasets/TUM_RGBD` folder. 
@@ -164,13 +163,17 @@ python scripts_run/summarize_pose_eval.py
 Only support for Wild-SLAM Mocap dataset. (Todo: this needs some time to be released)
 
 ## Acknowledgement
-We adapted some codes from some awesome repositories including [MonoGS](https://github.com/muskie82/MonoGS), [DROID-SLAM](https://github.com/princeton-vl/DROID-SLAM), [Splat-SLAM](https://github.com/google-research/Splat-SLAM), [GIORIE-SLAM](https://github.com/zhangganlin/GlORIE-SLAM), [nerf-on-the-go](https://github.com/cvg/nerf-on-the-go) and [Metric3D V2](https://github.com/YvanYin/Metric3D). Thanks for making codes public available. 
+We adapted some codes from some awesome repositories including [MonoGS](https://github.com/muskie82/MonoGS), [DROID-SLAM](https://github.com/princeton-vl/DROID-SLAM), [Splat-SLAM](https://github.com/google-research/Splat-SLAM), [GIORIE-SLAM](https://github.com/zhangganlin/GlORIE-SLAM), [nerf-on-the-go](https://github.com/cvg/nerf-on-the-go) and [Metric3D V2](https://github.com/YvanYin/Metric3D). Thanks for making codes publicly available. 
 
 ## Citation
 
 If you find our code or paper useful, please cite
 ```bibtex
-@inproceedings{add this when arXiv is available (todo)}
+@inproceedings{Zheng2025WildGS,
+  author={Zheng, Jianhao and Zhu, Zihan and Bieri, Valentin and Pollefeys, Marc and Peng, Songyou and Armeni Iro},
+  title     = {WildGS-SLAM: Monocular Gaussian Splatting SLAM in Dynamic Environments},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2025}
 }
 ```
 
