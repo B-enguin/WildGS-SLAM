@@ -15,7 +15,7 @@
     <a href="https://ir0.github.io/"><strong>Iro Armeni</strong></a>
 </p>
 <p align="center"> <strong>Computer Vision And Pattern Recognition (CVPR) 2025</strong></p>
-  <h3 align="center"><a href="no_link">Paper</a> | <a href="https://www.youtube.com/watch?v=xXuolzFvddQ">Video</a> | <a href="https://wildgs-slam.github.io/">Project Page</a></h3>
+  <h3 align="center"><a href="https://arxiv.org/abs/2504.03886">Paper</a> | <a href="https://www.youtube.com/watch?v=xXuolzFvddQ">Video</a> | <a href="https://wildgs-slam.github.io/">Project Page</a></h3>
   <div align="center"></div>
 </p>
 <p align="center">
