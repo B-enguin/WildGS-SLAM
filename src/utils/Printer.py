@@ -82,6 +82,7 @@ class Printer(TrivialPrinter):
                     pbar.refresh()
                 else:
                     pbar.write(message)
+                    print(message)
         while True:
             message = self.msg_queue.get()
             if message == "DONE":
