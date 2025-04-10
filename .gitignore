@@ -14,3 +14,7 @@ output*/
 .vscode/
 
 temp/
+
+*.out
+
+configs/

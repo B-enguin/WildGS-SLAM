@@ -150,6 +150,9 @@ class Mapper(object):
         self.frame_idxs = []  # the indices of keyframes in the original frame sequence
         self.video_idxs = []  # keyframe numbering (I sometimes call it kf_idx)
 
+        # Send Initial continue
+        self.pipe.send("continue")
+
         while True:
             if self.config['gui']:
                 if self.q_vis2main.empty():
@@ -167,6 +170,7 @@ class Mapper(object):
             frame_info = self.pipe.recv()
             frame_idx, video_idx = frame_info["timestamp"], frame_info["video_idx"]
             is_init, is_finished = frame_info["just_initialized"], frame_info["end"]
+            self.printer.print(f"Received frame {frame_idx}", FontColor.MAPPER)
 
             if is_finished:
                 self.printer.print("Done with Mapping and Tracking", FontColor.MAPPER)
@@ -1079,6 +1083,8 @@ class Mapper(object):
                     prob[view_idx] = cur_window_prob * iters / (len(current_window))
         prob /= prob.sum()
 
+        best_loss = torch.tensor([1e10], device=self.device)
+        best_loss_iter = 0
         for cur_iter in range(iters):
             self.iteration_count += 1
             self.iterations_after_densify_or_reset += 1
@@ -1219,6 +1225,21 @@ class Mapper(object):
 
             self.frame_count_log[viewpoint_kf_idx_stack[cam_idx]] += 1
 
+            # Early Stopping
+            if self.config["fast_mode"]:
+                if loss_mapping < best_loss - self.config['early_stop']['delta']:
+                    best_loss = loss_mapping
+                    best_loss_iter = cur_iter
+                
+                if cur_iter - best_loss_iter > self.config['early_stop']['patience']:
+                    self.printer.print(
+                        f"Early stopping at iteration {cur_iter} with loss {loss_mapping.item()}",
+                        FontColor.MAPPER,
+                    )
+                    with torch.no_grad():
+                        self._update_occ_aware_visibility(current_window)
+                    break
+
         # Online plotting
         if self.online_plotting:
             plot_dir = self.save_dir + "/online_plots"
@@ -1242,7 +1263,9 @@ class Mapper(object):
                 random_viewpoint_stack.append(viewpoint)
                 random_viewpoint_kf_idx_stack.append(kf_idx)
 
-        for _ in tqdm(range(iters)):
+        best_loss = torch.tensor([1e10], device=self.device)
+        best_loss_iter = 0
+        for cur_iter in tqdm(range(iters)):
             self.iteration_count += 1
             self.iterations_after_densify_or_reset += 1
 
@@ -1361,6 +1384,19 @@ class Mapper(object):
 
             for kf_idx in random_viewpoint_kf_idxs:
                 self.frame_count_log[kf_idx] += 1
+
+            # Early Stopping
+            if self.config["fast_mode"]:
+                if loss_mapping < best_loss - self.config['early_stop']['delta']:
+                    best_loss = loss_mapping
+                    best_loss_iter = cur_iter
+                
+                if cur_iter - best_loss_iter > self.config['early_stop']['patience']:
+                    self.printer.print(
+                        f"Early stopping at iteration {cur_iter} with loss {loss_mapping.item()}",
+                        FontColor.MAPPER,
+                    )
+                    break
 
         if self.vis_uncertainty_online:
             self._vis_uncertainty_mask_all(is_final=True)
