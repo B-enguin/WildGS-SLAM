@@ -150,6 +150,9 @@ class Mapper(object):
         self.frame_idxs = []  # the indices of keyframes in the original frame sequence
         self.video_idxs = []  # keyframe numbering (I sometimes call it kf_idx)
 
+        # Send Initial continue
+        self.pipe.send("continue")
+
         while True:
             if self.config['gui']:
                 if self.q_vis2main.empty():
@@ -167,6 +170,7 @@ class Mapper(object):
             frame_info = self.pipe.recv()
             frame_idx, video_idx = frame_info["timestamp"], frame_info["video_idx"]
             is_init, is_finished = frame_info["just_initialized"], frame_info["end"]
+            self.printer.print(f"Received frame {frame_idx}", FontColor.MAPPER)
 
             if is_finished:
                 self.printer.print("Done with Mapping and Tracking", FontColor.MAPPER)
