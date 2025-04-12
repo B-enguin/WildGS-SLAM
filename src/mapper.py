@@ -18,15 +18,15 @@ from scipy.ndimage import binary_erosion
 from multiprocessing.connection import Connection
 import torch.multiprocessing as mp
 
-from thirdparty.gaussian_splatting.utils.image_utils import psnr
-from thirdparty.gaussian_splatting.utils.system_utils import mkdir_p
-from thirdparty.gaussian_splatting.gaussian_renderer import render
-from thirdparty.gaussian_splatting.utils.general_utils import (
+from thirdparty.speedy_splat.utils.image_utils import psnr
+from thirdparty.speedy_splat.utils.system_utils import mkdir_p
+from thirdparty.speedy_splat.gaussian_renderer import render
+from thirdparty.speedy_splat.utils.general_utils import (
     rotation_matrix_to_quaternion,
     quaternion_multiply,
 )
-from thirdparty.gaussian_splatting.scene.gaussian_model import GaussianModel
-from thirdparty.gaussian_splatting.utils.graphics_utils import (
+from thirdparty.speedy_splat.scene.gaussian_model import GaussianModel
+from thirdparty.speedy_splat.utils.graphics_utils import (
     getProjectionMatrix2,
     getWorld2View2,
 )
@@ -45,6 +45,8 @@ from src.utils.dyn_uncertainty import mapping_utils as map_utils
 from src.utils.dyn_uncertainty.median_filter import MedianPool2d
 from src.utils.plot_utils import create_gif_from_directory
 from src.gui import gui_utils
+
+from torch.profiler import profile, record_function, ProfilerActivity
 
 class Mapper(object):
     """
@@ -138,6 +140,10 @@ class Mapper(object):
         self.q_main2vis = q_main2vis
         self.q_vis2main = q_vis2main
         self.pause = False
+
+        # Turn on Cudnn
+        torch.backends.cudnn.benchmark = True
+        torch.set_float32_matmul_precision('medium')
 
     def run(self):
         """
@@ -738,6 +744,7 @@ class Mapper(object):
 
         self.iteration_count = 0
         self.iterations_after_densify_or_reset = 0
+        self.iterations_since_prune = 0
         self.occ_aware_visibility = {}
         self.frame_count_log = {}
         self.current_window = []
@@ -933,6 +940,7 @@ class Mapper(object):
         for mapping_iteration in range(self.init_itr_num):
             self.iteration_count += 1
             self.iterations_after_densify_or_reset += 1
+            self.iterations_since_prune += 1
             # randomly select a viewpoint from the first K keyframes
             cam_idx = np.random.choice(range(len(viewpoint_stack)))
             viewpoint = viewpoint_stack[cam_idx]
@@ -1082,10 +1090,13 @@ class Mapper(object):
                 if kf_idx in current_window:
                     prob[view_idx] = cur_window_prob * iters / (len(current_window))
         prob /= prob.sum()
-
+        
+        best_loss = torch.tensor([1e10], device=self.device)
+        best_loss_iter = 0
         for cur_iter in range(iters):
             self.iteration_count += 1
             self.iterations_after_densify_or_reset += 1
+            self.iterations_since_prune += 1
 
             loss_mapping = 0
 
@@ -1196,9 +1207,26 @@ class Mapper(object):
                         self.gaussian_extent,
                         self.size_threshold,
                     )
+
                     gaussian_split = True
                     self.iterations_after_densify_or_reset = 0
                     self.printer.print("Densify and prune the Gaussians", FontColor.MAPPER)
+
+                if self.iterations_since_prune >= 100 and self.iteration_count < 1500:
+                    self.printer.print("Performing soft pruning", FontColor.MAPPER)
+                    self.printer.print(f"Before: {self.gaussians._xyz.shape[0]}")
+                    ## Soft Pruning
+                    self.prune_gaussians(0.8, viewpoint_stack)
+                    self.printer.print(f"After: {self.gaussians._xyz.shape[0]}")
+                    self.iterations_since_prune = 0
+                if self.iterations_since_prune >= 100 and self.iteration_count >= 1500:
+                    self.printer.print("Performing hard pruning", FontColor.MAPPER)
+                    self.printer.print(f"Before: {self.gaussians._xyz.shape[0]}")
+                    ## Hard Pruning
+                    self.prune_gaussians(0.3, viewpoint_stack)
+                    self.printer.print(f"After: {self.gaussians._xyz.shape[0]}")
+                    self.iterations_since_prune = 0
+
 
                 ## Opacity reset
                 if (self.iteration_count % self.gaussian_reset) == 0 and (
@@ -1219,9 +1247,38 @@ class Mapper(object):
                 self.keyframe_optimizers.zero_grad(set_to_none=True)
                 if self.uncertainty_aware:
                     self.uncer_optimizer.step()
-                    self.uncer_optimizer.zero_grad()
+                    self.uncer_optimizer.zero_grad(set_to_none=True)
 
             self.frame_count_log[viewpoint_kf_idx_stack[cam_idx]] += 1
+
+            # Early Stopping
+            if self.config["fast_mode"]:
+                if loss_mapping < best_loss - self.config['early_stop']['delta']:
+                    best_loss = loss_mapping
+                    best_loss_iter = cur_iter
+                
+                if cur_iter - best_loss_iter > self.config['early_stop']['patience']:
+                    self.printer.print(
+                        f"Early stopping at iteration {cur_iter} with loss {loss_mapping.item()}",
+                        FontColor.MAPPER,
+                    )
+                    with torch.no_grad():
+                        # if self.iteration_count < 1500:
+                        #     self.printer.print("Performing soft pruning", FontColor.MAPPER)
+                        #     self.printer.print(f"Before: {self.gaussians._xyz.shape[0]}")
+                        #     ## Soft Pruning
+                        #     self.prune_gaussians(0.8, [viewpoint_stack[cur_idx]])
+                        #     self.printer.print(f"After: {self.gaussians._xyz.shape[0]}")
+                        # if self.iteration_count >= 1500:
+                        #     self.printer.print("Performing hard pruning", FontColor.MAPPER)
+                        #     self.printer.print(f"Before: {self.gaussians._xyz.shape[0]}")
+                        #     ## Hard Pruning
+                        #     self.prune_gaussians(0.3, [viewpoint_stack[cur_idx]])
+                        #     self.printer.print(f"After: {self.gaussians._xyz.shape[0]}")
+
+                        self._update_occ_aware_visibility(current_window)
+
+                    break
 
         # Online plotting
         if self.online_plotting:
@@ -1246,7 +1303,9 @@ class Mapper(object):
                 random_viewpoint_stack.append(viewpoint)
                 random_viewpoint_kf_idx_stack.append(kf_idx)
 
-        for _ in tqdm(range(iters)):
+        best_loss = torch.tensor([1e10], device=self.device)
+        best_loss_iter = 0
+        for cur_iter in tqdm(range(iters)):
             self.iteration_count += 1
             self.iterations_after_densify_or_reset += 1
 
@@ -1361,10 +1420,23 @@ class Mapper(object):
                 self.keyframe_optimizers.zero_grad(set_to_none=True)
                 if self.uncertainty_aware:
                     self.uncer_optimizer.step()
-                    self.uncer_optimizer.zero_grad()
+                    self.uncer_optimizer.zero_grad(set_to_none=True)
 
             for kf_idx in random_viewpoint_kf_idxs:
                 self.frame_count_log[kf_idx] += 1
+
+            # Early Stopping
+            if self.config["fast_mode"]:
+                if loss_mapping < best_loss - self.config['early_stop']['delta']:
+                    best_loss = loss_mapping
+                    best_loss_iter = cur_iter
+                
+                if cur_iter - best_loss_iter > self.config['early_stop']['patience']:
+                    self.printer.print(
+                        f"Early stopping at iteration {cur_iter} with loss {loss_mapping.item()}",
+                        FontColor.MAPPER,
+                    )
+                    break
 
         if self.vis_uncertainty_online:
             self._vis_uncertainty_mask_all(is_final=True)
@@ -1654,3 +1726,28 @@ class Mapper(object):
             save_path = os.path.join(self.save_dir, "online_uncer", f"{cur_idx}.png")
         plt.savefig(save_path, bbox_inches="tight")
         plt.close()
+
+    @torch.enable_grad()
+    def prune_gaussians(self, prune_ratio, viewpoint_stack):
+        scores = torch.zeros_like(self.gaussians.get_opacity)
+        cam_idx = np.random.choice(np.arange(len(viewpoint_stack)))
+        for cam_idx in range(len(viewpoint_stack)):
+            viewpoint = viewpoint_stack[cam_idx]
+            self.score_func(viewpoint, scores)
+
+        self.gaussians.prune_gaussians(prune_ratio, scores)
+        
+
+    @torch.enable_grad()
+    def score_func(self, view, scores):
+
+        img_scores = torch.zeros_like(scores)
+        img_scores.requires_grad = True
+
+        image = render(view, self.gaussians, self.pipeline_params, self.background, scores=img_scores)['render']
+
+        # Backward computes and stores grad squared values
+        # in img_scores's grad
+        image.sum().backward()
+
+        scores += img_scores.grad
