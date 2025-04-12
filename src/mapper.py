@@ -20,12 +20,16 @@ import torch.multiprocessing as mp
 
 from thirdparty.gaussian_splatting.utils.image_utils import psnr
 from thirdparty.gaussian_splatting.utils.system_utils import mkdir_p
-from thirdparty.gaussian_splatting.gaussian_renderer import render
+# from thirdparty.gaussian_splatting.gaussian_renderer import render
+from thirdparty.speedysplat.gaussian_renderer import render
+
 from thirdparty.gaussian_splatting.utils.general_utils import (
     rotation_matrix_to_quaternion,
     quaternion_multiply,
 )
 from thirdparty.gaussian_splatting.scene.gaussian_model import GaussianModel
+from thirdparty.speedysplat.scene.gaussian_model import GaussianModel as GaussianModelSpeedy
+
 from thirdparty.gaussian_splatting.utils.graphics_utils import (
     getProjectionMatrix2,
     getWorld2View2,
@@ -45,6 +49,8 @@ from src.utils.dyn_uncertainty import mapping_utils as map_utils
 from src.utils.dyn_uncertainty.median_filter import MedianPool2d
 from src.utils.plot_utils import create_gif_from_directory
 from src.gui import gui_utils
+
+from torch.profiler import profile, ProfilerActivity, record_function
 
 class Mapper(object):
     """
@@ -75,7 +81,10 @@ class Mapper(object):
             "spherical_harmonics"
         ]
         self.model_params.sh_degree = 3 if use_spherical_harmonics else 0
-        self.gaussians = GaussianModel(self.model_params.sh_degree, config=self.config)
+        # self.gaussians = GaussianModel(self.model_params.sh_degree, config=self.config)
+        self.gaussians = GaussianModelSpeedy(
+            self.model_params.sh_degree, config=self.config
+        )
         self.gaussians.init_lr(6.0)
         self.gaussians.training_setup(self.opt_params)
 
@@ -150,6 +159,7 @@ class Mapper(object):
         self.frame_idxs = []  # the indices of keyframes in the original frame sequence
         self.video_idxs = []  # keyframe numbering (I sometimes call it kf_idx)
 
+        
         while True:
             if self.config['gui']:
                 if self.q_vis2main.empty():
@@ -240,6 +250,16 @@ class Mapper(object):
                 )
             self.keyframe_optimizers = torch.optim.Adam(opt_params)
 
+            # with profile(
+            #     activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+            #     profile_memory=True,
+            #     record_shapes=True,
+            #     with_stack=True,
+            #     with_flops=True,
+            #     with_modules=True,
+            #     use_cuda=True,
+            # ) as prof:
+            
             with Lock():
                 if self.config['fast_mode']:
                     # We are in fast mode,
@@ -259,6 +279,8 @@ class Mapper(object):
                     # do one more iteration after densify and prune
                     self.map_opt_online(self.current_window, iters=1)
             torch.cuda.empty_cache()
+            # prof.export_chrome_trace("./profiles/mapper_profile.json")
+
 
             if self.config['gui']:
                 self._send_to_gui(video_idx)
@@ -440,6 +462,7 @@ class Mapper(object):
             frame_mask = frame_idxs == frame_idx  # global variable
             if frame_mask.sum() == 0:
                 return
+            
             # Retrieve current set of points to be deformed
             # But first we need to retrieve all mean locations and clone them
             means = self.gaussians.get_xyz.detach()
@@ -1046,6 +1069,8 @@ class Mapper(object):
         return render_pkg
 
     def map_opt_online(self, current_window, iters=1):
+        
+            
         if len(current_window) == 0:
             raise ValueError("No keyframes in the current window")
 
@@ -1080,144 +1105,165 @@ class Mapper(object):
         prob /= prob.sum()
 
         for cur_iter in range(iters):
-            self.iteration_count += 1
-            self.iterations_after_densify_or_reset += 1
+            
+            with profile(
+                activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                record_shapes=False,
+                profile_memory=True,
+                with_stack=True,
+            ) as prof:
+                self.iteration_count += 1
+                self.iterations_after_densify_or_reset += 1
 
-            loss_mapping = 0
+                loss_mapping = 0
 
-            cam_idx = np.random.choice(np.arange(len(viewpoint_stack)), p=prob)
-            viewpoint = viewpoint_stack[cam_idx]
-            render_pkg = render(
-                viewpoint, self.gaussians, self.pipeline_params, self.background
-            )
-            (
-                image,
-                viewspace_point_tensor,
-                visibility_filter,
-                radii,
-                depth,
-                opacity,
-                n_touched,
-            ) = (
-                render_pkg["render"],
-                render_pkg["viewspace_points"],
-                render_pkg["visibility_filter"],
-                render_pkg["radii"],
-                render_pkg["depth"],
-                render_pkg["opacity"],
-                render_pkg["n_touched"],
-            )
-
-            if self.config["mapping"]["full_resolution"]:
-                depth = F.interpolate(
-                    depth.unsqueeze(0), viewpoint.depth.shape, mode="bicubic"
-                ).squeeze(0)
-            if not self.uncertainty_aware:
-                loss_mapping += get_loss_mapping(
-                    self.config["mapping"], image, depth, viewpoint, opacity
-                )
-            else:
-                train_frac = self.uncer_params["train_frac_fix"]
-                ssim_frac = self.uncer_params["train_frac_fix"]
-
+                cam_idx = np.random.choice(np.arange(len(viewpoint_stack)), p=prob)
+                viewpoint = viewpoint_stack[cam_idx]
+                with record_function("render"):
+                    render_pkg = render(
+                        viewpoint, self.gaussians, self.pipeline_params, self.background
+                    )
                 (
-                    current_uncertainty,
-                    current_loss_mapping,
-                ) = get_loss_mapping_uncertainty(
-                    self.config["mapping"],
-                    (torch.exp(viewpoint.exposure_a)) * image + viewpoint.exposure_b,
+                    image,
+                    viewspace_point_tensor,
+                    visibility_filter,
+                    radii,
                     depth,
-                    viewpoint,
                     opacity,
-                    self.uncer_network,
-                    train_frac,
-                    ssim_frac,
-                    freeze_uncertainty_loss=self.iterations_after_densify_or_reset < 20,
+                    n_touched,
+                ) = (
+                    render_pkg["render"],
+                    render_pkg["viewspace_points"],
+                    render_pkg["visibility_filter"],
+                    render_pkg["radii"],
+                    render_pkg["depth"],
+                    render_pkg["opacity"],
+                    render_pkg["n_touched"],
                 )
-                loss_mapping += current_loss_mapping
 
-                # Dino_regularization loss
-                if self.iterations_after_densify_or_reset >= 20:
-                    stride = self.config["mapping"]["uncertainty_params"]["reg_stride"]
-                    reg_multi = self.config["mapping"]["uncertainty_params"]["reg_mult"]
+                if self.config["mapping"]["full_resolution"]:
+                    depth = F.interpolate(
+                        depth.unsqueeze(0), viewpoint.depth.shape, mode="bicubic"
+                    ).squeeze(0)
+                if not self.uncertainty_aware:
+                    loss_mapping += get_loss_mapping(
+                        self.config["mapping"], image, depth, viewpoint, opacity
+                    )
+                else:
+                    train_frac = self.uncer_params["train_frac_fix"]
+                    ssim_frac = self.uncer_params["train_frac_fix"]
 
-                    viewpoint = viewpoint_stack[cam_idx]
-                    feature_buffer = [
-                        viewpoint_stack[reg_cam_idx].features.to(device=image.device)
-                        for reg_cam_idx in range(
-                            max(0, cam_idx - 2), min(len(viewpoint_stack), cam_idx + 3)
+                    with record_function("loss_mapping"):
+                        (
+                            current_uncertainty,
+                            current_loss_mapping,
+                        ) = get_loss_mapping_uncertainty(
+                            self.config["mapping"],
+                            (torch.exp(viewpoint.exposure_a)) * image + viewpoint.exposure_b,
+                            depth,
+                            viewpoint,
+                            opacity,
+                            self.uncer_network,
+                            train_frac,
+                            ssim_frac,
+                            freeze_uncertainty_loss=self.iterations_after_densify_or_reset < 20,
                         )
-                    ]
-                    feat_dim = feature_buffer[0].shape[-1]
-                    feature_buffer = torch.stack(feature_buffer).view(-1, feat_dim)
-                    num_samples = feature_buffer.shape[0] // (stride ** 4)
-                    sampled_feature = feature_buffer[
-                        torch.randperm(feature_buffer.shape[0])[:num_samples]
-                    ].unsqueeze(0)
-                    sampled_uncer = self.uncer_network(sampled_feature)
-                    loss_mapping += (
-                        reg_multi
-                        * map_utils.compute_dino_regularization_loss(
-                            sampled_uncer, sampled_feature
+                    loss_mapping += current_loss_mapping
+
+                    # Dino_regularization loss
+                    if self.iterations_after_densify_or_reset >= 20:
+                        stride = self.config["mapping"]["uncertainty_params"]["reg_stride"]
+                        reg_multi = self.config["mapping"]["uncertainty_params"]["reg_mult"]
+
+                        viewpoint = viewpoint_stack[cam_idx]
+                        feature_buffer = [
+                            viewpoint_stack[reg_cam_idx].features.to(device=image.device)
+                            for reg_cam_idx in range(
+                                max(0, cam_idx - 2), min(len(viewpoint_stack), cam_idx + 3)
+                            )
+                        ]
+                        feat_dim = feature_buffer[0].shape[-1]
+                        feature_buffer = torch.stack(feature_buffer).view(-1, feat_dim)
+                        num_samples = feature_buffer.shape[0] // (stride ** 4)
+                        sampled_feature = feature_buffer[
+                            torch.randperm(feature_buffer.shape[0])[:num_samples]
+                        ].unsqueeze(0)
+                        with record_function("uncer_network"):
+                            sampled_uncer = self.uncer_network(sampled_feature)
+                        # sampled_uncer = self.uncer_network(sampled_feature)
+                        loss_mapping += (
+                            reg_multi
+                            * map_utils.compute_dino_regularization_loss(
+                                sampled_uncer, sampled_feature
+                            )
                         )
+
+                scaling = self.gaussians.get_scaling
+                isotropic_loss = torch.abs(scaling - scaling.mean(dim=1).view(-1, 1))
+                loss_mapping += 10 * isotropic_loss.mean()
+
+                with record_function("backward"):
+                    loss_mapping.backward()
+                gaussian_split = False
+                # Deinsifying / Pruning Gaussians
+                with torch.no_grad():
+                    if cur_iter == iters - 1:
+                        self._update_occ_aware_visibility(current_window)
+
+                    self.gaussians.max_radii2D[visibility_filter] = torch.max(
+                        self.gaussians.max_radii2D[visibility_filter],
+                        radii[visibility_filter],
+                    )
+                    self.gaussians.add_densification_stats(
+                        viewspace_point_tensor, visibility_filter
                     )
 
-            scaling = self.gaussians.get_scaling
-            isotropic_loss = torch.abs(scaling - scaling.mean(dim=1).view(-1, 1))
-            loss_mapping += 10 * isotropic_loss.mean()
-
-            loss_mapping.backward()
-            gaussian_split = False
-            # Deinsifying / Pruning Gaussians
-            with torch.no_grad():
-                if cur_iter == iters - 1:
-                    self._update_occ_aware_visibility(current_window)
-
-                self.gaussians.max_radii2D[visibility_filter] = torch.max(
-                    self.gaussians.max_radii2D[visibility_filter],
-                    radii[visibility_filter],
-                )
-                self.gaussians.add_densification_stats(
-                    viewspace_point_tensor, visibility_filter
-                )
-
-                update_gaussian = (
-                    self.iteration_count % self.gaussian_update_every
-                    == self.gaussian_update_offset
-                )
-                if update_gaussian:
-                    self.gaussians.densify_and_prune(
-                        self.opt_params.densify_grad_threshold,
-                        self.gaussian_th,
-                        self.gaussian_extent,
-                        self.size_threshold,
+                    update_gaussian = (
+                        self.iteration_count % self.gaussian_update_every
+                        == self.gaussian_update_offset
                     )
-                    gaussian_split = True
-                    self.iterations_after_densify_or_reset = 0
-                    self.printer.print("Densify and prune the Gaussians", FontColor.MAPPER)
+                    if update_gaussian:
+                        with record_function("densify_and_prune"):
+                            self.gaussians.densify_and_prune(
+                                self.opt_params.densify_grad_threshold,
+                                self.gaussian_th,
+                                self.gaussian_extent,
+                                self.size_threshold,
+                            )
+                        gaussian_split = True
+                        self.iterations_after_densify_or_reset = 0
+                        self.printer.print("Densify and prune the Gaussians", FontColor.MAPPER)
 
-                ## Opacity reset
-                if (self.iteration_count % self.gaussian_reset) == 0 and (
-                    not update_gaussian
-                ):
-                    self.printer.print(
-                        "Resetting the opacity of non-visible Gaussians",
-                        FontColor.MAPPER,
-                    )
-                    self.gaussians.reset_opacity_nonvisible([visibility_filter])
-                    gaussian_split = True
-                    self.iterations_after_densify_or_reset = 0
+                    ## Opacity reset
+                    if (self.iteration_count % self.gaussian_reset) == 0 and (
+                        not update_gaussian
+                    ):
+                        self.printer.print(
+                            "Resetting the opacity of non-visible Gaussians",
+                            FontColor.MAPPER,
+                        )
+                        self.gaussians.reset_opacity_nonvisible([visibility_filter])
+                        gaussian_split = True
+                        self.iterations_after_densify_or_reset = 0
 
-                self.gaussians.optimizer.step()
-                self.gaussians.optimizer.zero_grad(set_to_none=True)
-                self.gaussians.update_learning_rate(self.iteration_count)
-                self.keyframe_optimizers.step()
-                self.keyframe_optimizers.zero_grad(set_to_none=True)
-                if self.uncertainty_aware:
-                    self.uncer_optimizer.step()
-                    self.uncer_optimizer.zero_grad()
+                    with record_function("gaussian_optimizer_step"):
+                        self.gaussians.optimizer.step()
+                        self.gaussians.optimizer.zero_grad(set_to_none=True)
+                        self.gaussians.update_learning_rate(self.iteration_count)
+                    with record_function("kf_optimizer_step"):
+                        self.keyframe_optimizers.step()
+                        self.keyframe_optimizers.zero_grad(set_to_none=True)
+                    if self.uncertainty_aware:
+                        with record_function("uncertainty_optimizer_step"):
+                            self.uncer_optimizer.step()
+                            self.uncer_optimizer.zero_grad()
 
-            self.frame_count_log[viewpoint_kf_idx_stack[cam_idx]] += 1
+                self.frame_count_log[viewpoint_kf_idx_stack[cam_idx]] += 1
+            # prof.export_chrome_trace("./profiles/map_opt_online_regularGS.json")
+            prof.export_chrome_trace("./profiles/map_opt_online_speedysplat.json")
+            # print(prof.key_averages().table(sort_by="cuda_memory_usage", row_limit=10))
+            # print(prof.key_averages().table(sort_by="self_cpu_memory_usage", row_limit=10))   
+        
 
         # Online plotting
         if self.online_plotting:

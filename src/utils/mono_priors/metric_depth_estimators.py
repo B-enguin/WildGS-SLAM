@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torchvision import transforms
 import torchvision.transforms.functional as TF
 from typing import Dict, Tuple, Union
+import os
 
 from thirdparty.depth_anything_v2.metric_depth.depth_anything_v2.dpt import (
     DepthAnythingV2,
@@ -22,6 +23,9 @@ def get_metric_depth_estimator(cfg: Dict) -> torch.nn.Module:
     """
     device = cfg["device"]
     depth_model = cfg["mono_prior"]["depth"]
+
+    if cfg["mono_prior"]["precomputed"]:
+        return None
 
     if "metric3d_vit" in depth_model:
         # Options: metric3d_vit_small, metric3d_vit_large, metric3d_vit_giant2
@@ -93,6 +97,15 @@ def predict_metric_depth(
     Returns:
         torch.Tensor: Predicted depth map.
     """
+
+    if cfg["mono_prior"]["precomputed"]:
+        data_path = f"{cfg['mono_prior']['save_path']}/{cfg['scene']}/mono_priors/depths/{idx:05d}.npy"
+        
+        if os.path.exists(data_path):
+            print(f"Loading depths from {data_path}")
+            depth_map = np.load(data_path)
+            return torch.from_numpy(depth_map).to(device)
+
     depth_model = cfg["mono_prior"]["depth"]
     if "metric3d_vit" in depth_model:
         output = _predict_metric3d_depth(model, input_tensor, cfg, device)

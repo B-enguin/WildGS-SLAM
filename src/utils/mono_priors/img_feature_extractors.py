@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms
+import os
 
 """
 From FiT3D, here we subclass the model instead of overriding the "get_intermediate_layers" method
@@ -71,6 +72,9 @@ def get_feature_extractor(cfg: Dict) -> nn.Module:
     device = cfg["device"]
     extractor_model = cfg["mono_prior"]["feature_extractor"]
 
+    if cfg["mono_prior"]["precomputed"]:
+        return None
+
     if extractor_model in ["dinov2_reg_small_fine", "dinov2_small_fine"]:
         return Fit3DModels(extractor_model, device)
     elif extractor_model in ["dinov2_vits14", "dinov2_vits14_reg"]:
@@ -107,6 +111,14 @@ def predict_img_features(
     Returns:
         torch.Tensor: Extracted features.
     """
+
+    if cfg["mono_prior"]['precomputed']:
+        data_path = f"{cfg['mono_prior']['save_path']}/{cfg['scene']}/mono_priors/features/{idx:05d}{suffix}.npy"
+        if os.path.exists(data_path):
+            print(f"Loading features from {data_path}")
+            features = np.load(data_path)
+            return torch.from_numpy(features).to(device)
+
     extractor_model = cfg["mono_prior"]["feature_extractor"]
     stride = 14
     mean = [0.485, 0.456, 0.406]

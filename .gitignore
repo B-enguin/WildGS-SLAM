@@ -14,3 +14,9 @@ output*/
 .vscode/
 
 temp/
+
+logs/
+profiles/
+*.out
+
+thirdparty/speedysplat_old/
