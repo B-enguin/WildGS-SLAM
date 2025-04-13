@@ -10,6 +10,10 @@ class MLPNetwork(nn.Module):
         self.output_layer_input_dim = hidden_dim
         
         # Initialize MLP layers
+        self.bn_layers = nn.ModuleList()
+        for i in range(net_depth):
+            self.bn_layers.append(nn.LayerNorm(hidden_dim))
+
         self.layers = nn.ModuleList()
         for i in range(net_depth):
             dense_layer = nn.Linear(input_dim if i == 0 else hidden_dim, hidden_dim)
@@ -49,8 +53,9 @@ class MLPNetwork(nn.Module):
         x = x.view(-1, x.size()[-1])
         
         # Pass through MLP layers
-        for layer in self.layers:
+        for i, layer in enumerate(self.layers):
             x = layer(x)
+            x = self.bn_layers[i](x)
             x = self.net_activation(x)
             x = F.dropout(x, p=0.2)
 
