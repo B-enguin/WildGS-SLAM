@@ -331,8 +331,8 @@ class SLAM:
             for process in mp.active_children():
                 process.terminate()
                 process.join()
-        # prof.export_chrome_trace("./profiles/trace_regularGS.json")
-        prof.export_chrome_trace("./profiles/trace_sppedysplat.json")
+        prof.export_chrome_trace("./profiles/trace_regularGS_earlystop.json")
+        # prof.export_chrome_trace("./profiles/trace_speedysplat_earlystop.json")
         
         end_time = time.time()
         elapsed = end_time - start_time

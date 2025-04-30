@@ -20,3 +20,5 @@ profiles/
 *.out
 
 thirdparty/speedysplat_old/
+
+configs/

@@ -1,10 +1,14 @@
 verbose: True
 gui: False
 stride: 1            # use every X image from the dataset  # 1
-max_frames: 200       # use the first X images from the dataset, -1 means using all
+max_frames: -1      # use the first X images from the dataset, -1 means using all
 setup_seed: 43
 fast_mode: True
 device: "cuda:0"
+
+early_stop:
+  delta: 0.001
+  patience: 5.0
 
 mapping:
   online_plotting: False # render and save images online
