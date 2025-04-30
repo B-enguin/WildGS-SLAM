@@ -16,6 +16,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
+from fused_ssim import fused_ssim
 
 
 def l1_loss(network_output, gt):
@@ -58,15 +59,17 @@ def create_window(window_size, channel):
     return window
 
 
+# def ssim(img1, img2, window_size=11, size_average=True):
+#     channel = img1.size(-3)
+#     window = create_window(window_size, channel)
+
+#     if img1.is_cuda:
+#         window = window.cuda(img1.get_device())
+#     window = window.type_as(img1)
+
+#     return _ssim(img1, img2, window, window_size, channel, size_average)
 def ssim(img1, img2, window_size=11, size_average=True):
-    channel = img1.size(-3)
-    window = create_window(window_size, channel)
-
-    if img1.is_cuda:
-        window = window.cuda(img1.get_device())
-    window = window.type_as(img1)
-
-    return _ssim(img1, img2, window, window_size, channel, size_average)
+    return fused_ssim(img1[None, ...], img2[None, ...])
 
 
 def _ssim(img1, img2, window, window_size, channel, size_average=True):
