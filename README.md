@@ -121,7 +121,7 @@ cam:
 
 ## Run
 
-### Wild-SLAM Mocap Dataset ([🤗 Hugging Face](https://huggingface.co/datasets/gradient-spaces/Wild-SLAM/tree/main))
+### Wild-SLAM Mocap Dataset ([🤗 Hugging Face](https://huggingface.co/datasets/gradient-spaces/Wild-SLAM/tree/main/Mocap))
 Download the dataset by the following command. Although WildGS-SLAM is a monocular SLAM system, we also provide depth frames for other RGB-D SLAM methods. The following command only downloads the 10 dynamic sequences. However, we also provide some static sequences. Please check the huggingface page to download them if you are interested in testing with these sequences.
 ```bash
 bash scripts_downloading/download_wild_slam_mocap_scene1.sh
@@ -132,6 +132,18 @@ You can run WildGS-SLAM via the following command:
 python run.py  ./configs/Dynamic/Wild_SLAM_Mocap/{config_file} #run a single sequence
 bash scripts_run/run_wild_slam_mocap_all.sh #run all dynamic sequences
 ```
+
+### Wild-SLAM iPhone Dataset ([🤗 Hugging Face](https://huggingface.co/datasets/gradient-spaces/Wild-SLAM/tree/main/iPhone))
+Download the dataset by the following command:
+```bash
+bash scripts_downloading/download_wild_slam_iphone.sh
+```
+
+You can run WildGS-SLAM on any of the sequences via the following command:
+```bash
+python run.py  ./configs/Dynamic/Wild_SLAM_iPhone/{config_file} #run a single sequence
+```
+The data is collected by an iPhone and no GT camera pose is available. Therefore, it will be no files related to pose evaluation saved.
 
 ### Bonn Dynamic Dataset
 Download the data as below and the data is saved into the `./Datasets/Bonn` folder. Note that the script only downloads the 8 sequences reported in the paper. To get other sequences, you can download from the [webiste of Bonn Dynamic Dataset](https://www.ipb.uni-bonn.de/data/rgbd-dynamic-dataset/index.html).
