@@ -6,15 +6,11 @@ setup_seed: 43
 fast_mode: True
 device: "cuda:0"
 
-early_stop:
-  delta: 0.001
-  patience: 5.0
-
 mapping:
   online_plotting: False # render and save images online
-  full_resolution: False # if using the full resolution for mapping, but we always keep downsampled size for tracking
-  final_refine_iters: 5000 # iterations of final refinement, it will be forced to be 3000 if fast_mode is on # 20000
-  eval_before_final_ba: True
+  full_resolution: True # if using the full resolution for mapping, but we always keep downsampled size for tracking
+  final_refine_iters: 1000 # iterations of final refinement, it will be forced to be 3000 if fast_mode is on # 20000
+  eval_before_final_ba: False
   deform_gaussians: True # apply transformation on Gaussians to account for loop closure and BA
   pcd_downsample: 32 # downsamples the unprojected depth map --> point cloud
   pcd_downsample_init: 16 # first frame downsampling factor is smaller
@@ -85,7 +81,7 @@ mapping:
 
 tracking:
   pretrained: ./pretrained/droid.pth
-  buffer: 70      # maximum number of keyframes that can be stored # 350
+  buffer: 70     # maximum number of keyframes that can be stored
   beta: 0.75      # beta * Distance(R|t) + (1-beta) * Distance(I|t), refer to droid_kernels.cu:frame_distance_kernel
   warmup: 12       # use the first X keyframes for bootstrapping the tracker
   max_age: 50     # remove edges in the graph if they have been updated more than X times
@@ -106,7 +102,7 @@ tracking:
     nms: 1                 # r_local in GO-SLAM paper
     max_factors: 75        # maximum number of edges in local ba
   backend:
-    final_ba: False # whether to enable final global bundle adjustment in the end
+    final_ba: True # whether to enable final global bundle adjustment in the end
     ba_freq: 20    # do online bundle adjustment every X keyframes
     thresh: 25.0   # only consider edge with avg flow < X pixels
     radius: 1      # build edges within local window [i-radius, i]
@@ -151,7 +147,7 @@ mono_prior:
 
   # Available options: {dinov2_reg_small_fine, dinov2_small_fine} from fit3d, and {dinov2_vits14, dinov2_vits14_reg}
   feature_extractor: 'dinov2_reg_small_fine' 
-  precomputed: True
+  precomputed: False
   save_path: /work/courses/3dv/23-2/precomputed
 
 data:
@@ -159,3 +155,7 @@ data:
   input_folder: Please_specify_the_path_to_the_dataset
 
 dataset: 'tumrgbd'
+
+early_stop:
+  patience: 50
+  delta: 0.0001
