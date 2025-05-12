@@ -371,8 +371,8 @@ class Mapper(object):
         for keyframe_idx, frame_idx in zip(self.video_idxs, self.frame_idxs):
             # Get updated pose and depth
             if self.video.metric_depth_reg:
-                c2w_updated = self.video.get_pose(keyframe_idx, self.device)
-                w2c_updated = torch.linalg.inv(c2w_updated)
+                w2c_updated = self.video.get_pose(keyframe_idx, self.device)
+                # w2c_updated = torch.linalg.inv(c2w_updated)
                 depth_updated = None
                 invalid = False
             else:
@@ -572,11 +572,11 @@ class Mapper(object):
             ).long()
 
     def get_w2c_and_depth(self, video_idx, idx, mono_depth, print_info=False):
-        est_frontend_depth, valid_depth_mask, c2w = self.video.get_depth_and_pose(
+        est_frontend_depth, valid_depth_mask, w2c = self.video.get_depth_and_pose(
             video_idx, self.device
         )
-        c2w = c2w.to(self.device)
-        w2c = torch.linalg.inv(c2w)
+        # c2w = c2w.to(self.device)
+        # w2c = torch.linalg.inv(c2w)
 
         if self.video.metric_depth_reg:
             return est_frontend_depth, w2c, False
@@ -1022,7 +1022,11 @@ class Mapper(object):
                     self.gaussians.reset_opacity()
                     self.iterations_after_densify_or_reset = 0
 
-                self.gaussians.optimizer.step()
+                if self.config["mapping"]["opt_params"]["optimizer"] == "sparse_adam":
+                    visible = radii > 0
+                    self.gaussians.optimizer.step(visible, radii.shape[0])
+                else:
+                    self.gaussians.optimizer.step()
                 self.gaussians.optimizer.zero_grad(set_to_none=True)
                 self.gaussians.update_learning_rate(self.iteration_count)
                 self.keyframe_optimizers.step()
@@ -1208,7 +1212,11 @@ class Mapper(object):
                     gaussian_split = True
                     self.iterations_after_densify_or_reset = 0
 
-                self.gaussians.optimizer.step()
+                if self.config["mapping"]["opt_params"]["optimizer"] == "sparse_adam":
+                    visible = radii > 0
+                    self.gaussians.optimizer.step(visible, radii.shape[0])
+                else:
+                    self.gaussians.optimizer.step()
                 self.gaussians.optimizer.zero_grad(set_to_none=True)
                 self.gaussians.update_learning_rate(self.iteration_count)
                 self.keyframe_optimizers.step()
@@ -1349,7 +1357,11 @@ class Mapper(object):
             loss_mapping.backward()
 
             with torch.no_grad():
-                self.gaussians.optimizer.step()
+                if self.config["mapping"]["opt_params"]["optimizer"] == "sparse_adam":
+                    visible = radii > 0
+                    self.gaussians.optimizer.step(visible, radii.shape[0])
+                else:
+                    self.gaussians.optimizer.step()
                 self.gaussians.optimizer.zero_grad(set_to_none=True)
                 self.gaussians.update_learning_rate(self.iteration_count)
                 # Optimize the exposure compensation

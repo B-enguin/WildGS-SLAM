@@ -27,6 +27,7 @@ def render(
     pipe,
     bg_color: torch.Tensor,
     scaling_modifier=1.0,
+    separate_sh=False,
     override_color=None,
     mask=None,
 ):
@@ -69,6 +70,7 @@ def render(
         campos=viewpoint_camera.camera_center,
         prefiltered=False,
         debug=False,
+        antialiasing=False
     )
 
     rasterizer = GaussianRasterizer(raster_settings=raster_settings)
@@ -108,7 +110,10 @@ def render(
             sh2rgb = eval_sh(pc.active_sh_degree, shs_view, dir_pp_normalized)
             colors_precomp = torch.clamp_min(sh2rgb + 0.5, 0.0)
         else:
-            shs = pc.get_features
+            if separate_sh:
+                dc, shs = pc.get_features_dc, pc.get_features_rest
+            else:
+                shs = pc.get_features
     else:
         colors_precomp = override_color
 
@@ -123,6 +128,20 @@ def render(
             scales=scales[mask],
             rotations=rotations[mask],
             cov3D_precomp=cov3D_precomp[mask] if cov3D_precomp is not None else None,
+            theta=viewpoint_camera.cam_rot_delta,
+            rho=viewpoint_camera.cam_trans_delta,
+        )
+    elif separate_sh:
+        rendered_image, radii, depth, opacity, n_touched = rasterizer(
+            means3D=means3D,
+            means2D=means2D,
+            dc=dc,
+            shs=shs,
+            colors_precomp=colors_precomp,
+            opacities=opacity,
+            scales=scales,
+            rotations=rotations,
+            cov3D_precomp=cov3D_precomp,
             theta=viewpoint_camera.cam_rot_delta,
             rho=viewpoint_camera.cam_trans_delta,
         )
@@ -141,7 +160,7 @@ def render(
         )
 
     # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
-    # They will be excluded from value updates used in the splitting criteria.
+    # They will be excludged from value updates used in the splitting criteria.
     return {
         "render": rendered_image,
         "viewspace_points": screenspace_points,

@@ -386,9 +386,9 @@ class DepthVideo:
         return [self.depth_scale[index], self.depth_shift[index]]
 
     def get_pose(self,index,device):
-        w2c = lietorch.SE3(self.poses[index].clone()).to(device) # Tw(droid)_to_c
-        c2w = w2c.inv().matrix()  # [4, 4]
-        return c2w
+        w2c = lietorch.SE3(self.poses[index].clone()).to(device).matrix() # Tw(droid)_to_c
+        # c2w = w2c.inv().matrix()  # [4, 4]
+        return w2c
 
     def get_depth_and_pose(self,index,device):
         with self.get_lock():

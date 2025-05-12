@@ -31,6 +31,7 @@ from thirdparty.gaussian_splatting.utils.graphics_utils import BasicPointCloud, 
 from thirdparty.gaussian_splatting.utils.sh_utils import RGB2SH
 from thirdparty.gaussian_splatting.utils.system_utils import mkdir_p
 
+from diff_gaussian_rasterization import SparseGaussianAdam
 
 class GaussianModel:
     def __init__(self, sh_degree: int, config=None):
@@ -91,6 +92,14 @@ class GaussianModel:
         features_dc = self._features_dc
         features_rest = self._features_rest
         return torch.cat((features_dc, features_rest), dim=1)
+
+    @property
+    def get_features_dc(self):
+        return self._features_dc
+    
+    @property
+    def get_features_rest(self):
+        return self._features_rest
 
     @property
     def get_opacity(self):
@@ -306,7 +315,10 @@ class GaussianModel:
             },
         ]
 
-        self.optimizer = torch.optim.Adam(l, lr=0.0, eps=1e-15)
+        if training_args.optimizer == "sparse_adam":
+            self.optimizer = SparseGaussianAdam(l, lr=0.0, eps=1e-15)
+        # else:
+        #     self.optimizer = torch.optim.Adam(l, lr=0.0, eps=1e-15)
         self.xyz_scheduler_args = get_expon_lr_func(
             lr_init=training_args.position_lr_init * self.spatial_lr_scale,
             lr_final=training_args.position_lr_final * self.spatial_lr_scale,
