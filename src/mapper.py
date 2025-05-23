@@ -250,6 +250,7 @@ class Mapper(object):
                         )
                     else:
                         self._update_occ_aware_visibility(self.current_window)
+                        gaussian_split = None
                 else:
                     gaussian_split = self.map_opt_online(
                         self.current_window, iters=self.mapping_itr_num
