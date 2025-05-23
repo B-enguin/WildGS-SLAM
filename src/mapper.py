@@ -17,6 +17,7 @@ from torch.multiprocessing import Lock
 from scipy.ndimage import binary_erosion
 from multiprocessing.connection import Connection
 import torch.multiprocessing as mp
+import time
 
 from thirdparty.gaussian_splatting.utils.image_utils import psnr
 from thirdparty.gaussian_splatting.utils.system_utils import mkdir_p
@@ -150,6 +151,7 @@ class Mapper(object):
         self.frame_idxs = []  # the indices of keyframes in the original frame sequence
         self.video_idxs = []  # keyframe numbering (I sometimes call it kf_idx)
 
+        start = time.time()
         while True:
             if self.config['gui']:
                 if self.q_vis2main.empty():
@@ -241,6 +243,7 @@ class Mapper(object):
             self.keyframe_optimizers = torch.optim.Adam(opt_params)
 
             with Lock():
+                start_map = time.time()
                 if self.config['fast_mode']:
                     # We are in fast mode,
                     # update map and uncertainty MLP every 4 key frames
@@ -258,12 +261,25 @@ class Mapper(object):
                 if gaussian_split:
                     # do one more iteration after densify and prune
                     self.map_opt_online(self.current_window, iters=1)
+
+                torch.cuda.synchronize()
+                end_map = time.time()
+                with open("output.txt", "a") as f:
+                    f.write(
+                        f"Mapping time: {end_map - start_map:.2f} seconds\n"
+                    )
+
             torch.cuda.empty_cache()
 
             if self.config['gui']:
                 self._send_to_gui(video_idx)
 
             self.pipe.send("continue")
+
+        torch.cuda.synchronize()
+        end = time.time()
+        with open("output.txt", "a") as f:
+            f.write(f"Total Mapping time: {end - start:.2f} seconds\n")
 
     """
     Utility functions
