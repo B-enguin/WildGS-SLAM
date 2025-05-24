@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from src.utils.dyn_uncertainty.median_filter import MedianPool2d
 
+from fused_ssim import fused_ssim_Go
 
 def resample_tensor_to_shape(
     tensor: torch.Tensor,
@@ -278,15 +279,23 @@ def compute_mapping_loss_components(
     # Compute SSIM-based loss
     # 0.8 is ssim_anneal, this number is directly taken from nerf-on-the-go
     ssim_weight = 100 + 900 * compute_bias_factor(ssim_fraction, 0.8)
-    luminance, contrast, structure = compute_ssim_components(
-        gt_img, rendered_img, window_size=uncertainty_config["ssim_window_size"]
-    )
+    # luminance, contrast, structure = compute_ssim_components(
+    #     gt_img, rendered_img, window_size=uncertainty_config["ssim_window_size"]
+    # )
+    # ssim_loss = torch.clip(
+    #     resized_opacity
+    #     * ssim_weight
+    #     * (1 - luminance)
+    #     * (1 - structure)
+    #     * (1 - contrast),
+    #     max=5.0,
+    # )
+
+    ssim = fused_ssim_Go(gt_img.unsqueeze(0), rendered_img.unsqueeze(0)).mean(dim=1).squeeze()
     ssim_loss = torch.clip(
         resized_opacity
         * ssim_weight
-        * (1 - luminance)
-        * (1 - structure)
-        * (1 - contrast),
+        * ssim,
         max=5.0,
     )
 
