@@ -95,9 +95,27 @@ def create_2d_gaussian_window(window_size: int, num_channels: int) -> torch.Tens
     )
     return window
 
+def create_1d_gaussian_window(
+    window_size: int, num_channels: int
+) -> torch.Tensor:
+    """
+    Create 1D Gaussian window for SSIM computation.
+
+    Args:
+        window_size: Size of the window
+        num_channels: Number of channels in the input
+    Returns:
+        1D Gaussian window
+    """
+    _1D_window = generate_gaussian_kernel(window_size, GAUSSIAN_SIGMA).unsqueeze(0)
+    window = Variable(
+        _1D_window.expand(num_channels, 1, 1, window_size).contiguous()
+    )
+    return window
+
 
 def compute_ssim_components(
-    img1: torch.Tensor, img2: torch.Tensor, window_size: int = 11
+    img1: torch.Tensor, img2: torch.Tensor, window_size: int = 11, fused: bool = True
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Compute SSIM components.
@@ -112,7 +130,16 @@ def compute_ssim_components(
     Returns:
         Tuple of (luminance, contrast, structure) components
     """
+    
     num_channels = img1.size(-3)
+    
+    if fused:
+        window_1d = create_1d_gaussian_window(window_size, num_channels)
+        if img1.is_cuda:
+            window_1d = window_1d.cuda(img1.get_device())
+        window_1d = window_1d.type_as(img1)
+        return _ssim_fused_conv(img1, img2, window_1d, window_size, num_channels)
+    
     window = create_2d_gaussian_window(window_size, num_channels)
 
     if img1.is_cuda:
@@ -120,6 +147,76 @@ def compute_ssim_components(
     window = window.type_as(img1)
 
     return _ssim(img1, img2, window, window_size, num_channels)
+
+def _ssim_fused_conv(
+    img1: torch.Tensor,
+    img2: torch.Tensor,
+    window_1d: torch.Tensor,
+    window_size: int,
+    num_channels: int,
+    eps: float = EPSILON,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Compute SSIM components using fused 1D Gaussian kernel convolutions.
+    Args:
+        img1, img2: Input images
+        window_1d: 1D Gaussian kernel (shape: [1, 1, 1, window_size] or [1, 1, window_size, 1])
+        window_size: Size of the 1D window
+        num_channels: Number of image channels
+        eps: Numerical stability constant
+    Returns:
+        Tuple of (luminance, contrast, structure)
+    """
+    def fused_conv(img, window_1d):
+        # Apply horizontal then vertical 1D convolution (separable convolution)
+        out = F.conv2d(img, window_1d, padding=(0, window_size // 2), groups=num_channels)
+        out = F.conv2d(out, window_1d.transpose(2, 3), padding=(window_size // 2, 0), groups=num_channels)
+        return out
+
+    if len(img1.shape) == 3:
+        img1 = img1.unsqueeze(0)
+        img2 = img2.unsqueeze(0)
+        unsqueeze_orig = True
+    else:
+        unsqueeze_orig = False
+
+    mu1 = fused_conv(img1, window_1d)
+    mu2 = fused_conv(img2, window_1d)
+
+    mu1_sq = mu1.pow(2)
+    mu2_sq = mu2.pow(2)
+    mu1_mu2 = mu1 * mu2
+
+    sigma1_sq = fused_conv(img1 * img1, window_1d) - mu1_sq
+    sigma2_sq = fused_conv(img2 * img2, window_1d) - mu2_sq
+    sigma12 = fused_conv(img1 * img2, window_1d) - mu1_mu2
+
+    epsilon = torch.tensor([eps], device=img1.device)
+    sigma1_sq = torch.maximum(epsilon, sigma1_sq)
+    sigma2_sq = torch.maximum(epsilon, sigma2_sq)
+    sigma12 = torch.sign(sigma12) * torch.minimum(
+        torch.sqrt(sigma1_sq * sigma2_sq), torch.abs(sigma12)
+    )
+
+    luminance = (2 * mu1_mu2 + SSIM_C1) / (mu1_sq + mu2_sq + SSIM_C1)
+    contrast = (2 * torch.sqrt(sigma1_sq) * torch.sqrt(sigma2_sq) + SSIM_C2) / (
+        sigma1_sq + sigma2_sq + SSIM_C2
+    )
+    structure = (sigma12 + SSIM_C3) / (
+        torch.sqrt(sigma1_sq) * torch.sqrt(sigma2_sq) + SSIM_C3
+    )
+
+    contrast = torch.clamp(contrast, max=SSIM_MAX_CLIP)
+    structure = torch.clamp(structure, max=SSIM_MAX_CLIP)
+
+    if unsqueeze_orig:
+        return (
+            luminance.mean(1).squeeze(),
+            contrast.mean(1).squeeze(),
+            structure.mean(1).squeeze(),
+        )
+    return luminance.mean(1), contrast.mean(1), structure.mean(1)
+
 
 
 def _ssim(

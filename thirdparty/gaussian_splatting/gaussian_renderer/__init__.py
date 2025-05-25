@@ -17,6 +17,7 @@ from diff_gaussian_rasterization import (
     GaussianRasterizer,
 )
 
+
 from thirdparty.gaussian_splatting.scene.gaussian_model import GaussianModel
 from thirdparty.gaussian_splatting.utils.sh_utils import eval_sh
 
@@ -69,6 +70,7 @@ def render(
         campos=viewpoint_camera.camera_center,
         prefiltered=False,
         debug=False,
+        antialiasing=False,
     )
 
     rasterizer = GaussianRasterizer(raster_settings=raster_settings)
@@ -111,6 +113,13 @@ def render(
             shs = pc.get_features
     else:
         colors_precomp = override_color
+        
+    # SH C0 constant
+    SH_C0 = 0.28209479177387814  # from the original C++ code
+
+    # Extract SH0 coefficients: shape (N, 3)
+    direct_color = SH_C0 * pc.get_features[:, :, :]  # [N, 3]
+
 
     # Rasterize visible Gaussians to image, obtain their radii (on screen).
     if mask is not None:
@@ -125,6 +134,7 @@ def render(
             cov3D_precomp=cov3D_precomp[mask] if cov3D_precomp is not None else None,
             theta=viewpoint_camera.cam_rot_delta,
             rho=viewpoint_camera.cam_trans_delta,
+            dc=direct_color[mask],
         )
     else:
         rendered_image, radii, depth, opacity, n_touched = rasterizer(
@@ -138,6 +148,7 @@ def render(
             cov3D_precomp=cov3D_precomp,
             theta=viewpoint_camera.cam_rot_delta,
             rho=viewpoint_camera.cam_trans_delta,
+            dc=direct_color,
         )
 
     # Those Gaussians that were frustum culled or had a radius of 0 were not visible.

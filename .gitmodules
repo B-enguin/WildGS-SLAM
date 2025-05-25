@@ -22,3 +22,7 @@
 [submodule "thirdparty/LiteGS"]
 	path = thirdparty/LiteGS/litegs
 	url = git@github.com:MooreThreads/LiteGS.git
+[submodule "thirdparty/speedy_splat"]
+[submodule "thirdparty/diff-gaussian-rasterization-accel-pose"]
+	path = thirdparty/diff-gaussian-rasterization-accel-pose
+	url = git@github.com:B-enguin/diff-gaussian-rasterization-accel-pose.git

@@ -387,8 +387,10 @@ class DepthVideo:
 
     def get_pose(self,index,device):
         w2c = lietorch.SE3(self.poses[index].clone()).to(device) # Tw(droid)_to_c
-        c2w = w2c.inv().matrix()  # [4, 4]
-        return c2w
+        
+        # c2w = w2c.inv().matrix()  # [4, 4]
+        # return c2w
+        return w2c.matrix()
 
     def get_depth_and_pose(self,index,device):
         with self.get_lock():
@@ -396,13 +398,13 @@ class DepthVideo:
                 est_disp = self.mono_disps_up[index].clone().to(device)  # [h, w]
                 est_depth = torch.where(est_disp>0.0, 1.0 / (est_disp), 0.0)
                 depth_mask = torch.ones_like(est_disp,dtype=torch.bool).to(device)
-                c2w = self.get_pose(index,device)
+                w2c = self.get_pose(index,device)
             else:
                 est_disp = self.disps_up[index].clone().to(device)  # [h, w]
                 est_depth = 1.0 / (est_disp)
                 depth_mask = self.valid_depth_mask[index].clone().to(device)
-                c2w = self.get_pose(index,device)
-        return est_depth, depth_mask, c2w
+                w2c = self.get_pose(index,device)
+        return est_depth, depth_mask, w2c
     
     @torch.no_grad()
     def update_valid_depth_mask(self,up=True):

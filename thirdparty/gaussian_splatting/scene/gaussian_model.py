@@ -31,6 +31,12 @@ from thirdparty.gaussian_splatting.utils.graphics_utils import BasicPointCloud, 
 from thirdparty.gaussian_splatting.utils.sh_utils import RGB2SH
 from thirdparty.gaussian_splatting.utils.system_utils import mkdir_p
 
+try:
+    from diff_gaussian_rasterization import SparseGaussianAdam
+    SPARSE_ADAM_AVAILABLE = True
+except:
+    SPARSE_ADAM_AVAILABLE = False
+
 
 class GaussianModel:
     def __init__(self, sh_degree: int, config=None):
@@ -44,6 +50,8 @@ class GaussianModel:
         self._rotation = torch.empty(0, device="cuda")
         self._opacity = torch.empty(0, device="cuda")
         self.max_radii2D = torch.empty(0, device="cuda")
+        self.tmp_radii = torch.empty(0, device="cuda")
+        
         self.xyz_gradient_accum = torch.empty(0, device="cuda")
 
         self.unique_kfIDs = torch.empty(0).int()
@@ -245,6 +253,7 @@ class GaussianModel:
         
         # Each Gaussian is assigned the kf id that anchored it. This is great,
         # since I need this for the deformation.
+        new_tmp_radii = torch.zeros((new_xyz.shape[0]), dtype=torch.float32, device="cuda")
         new_unique_kfIDs = torch.ones((new_xyz.shape[0])).int() * kf_id
         new_n_obs = torch.zeros((new_xyz.shape[0])).int()
         self.densification_postfix(
@@ -254,6 +263,7 @@ class GaussianModel:
             new_opacity,
             new_scaling,
             new_rotation,
+            new_tmp_radii,
             new_kf_ids=new_unique_kfIDs,
             new_n_obs=new_n_obs,
         )
@@ -306,7 +316,22 @@ class GaussianModel:
             },
         ]
 
-        self.optimizer = torch.optim.Adam(l, lr=0.0, eps=1e-15)
+        # if not SPARSE_ADAM_AVAILABLE:
+        #     self.optimizer = torch.optim.Adam(l, lr=0.0, eps=1e-15)
+        # else:
+        #     self.optimizer = SparseGaussianAdam(
+        #         l,
+        #         lr=0.0,
+        #         eps=1e-15,
+        #     )
+        # self.optimizer = torch.optim.Adam(l, lr=0.0, eps=1e-15)
+        self.optimizer = SparseGaussianAdam(
+                l,
+                lr=0.0,
+                eps=1e-15,
+            )
+        # self.optimizer = torch.optim.SparseAdam(l, lr=1e-15, eps=1e-15)
+
         self.xyz_scheduler_args = get_expon_lr_func(
             lr_init=training_args.position_lr_init * self.spatial_lr_scale,
             lr_final=training_args.position_lr_final * self.spatial_lr_scale,
@@ -560,6 +585,7 @@ class GaussianModel:
 
         self.denom = self.denom[valid_points_mask]
         self.max_radii2D = self.max_radii2D[valid_points_mask]
+        self.tmp_radii = self.tmp_radii[valid_points_mask]
         self.unique_kfIDs = self.unique_kfIDs[valid_points_mask.cpu()]
         self.n_obs = self.n_obs[valid_points_mask.cpu()]
 
@@ -607,6 +633,7 @@ class GaussianModel:
         new_opacities,
         new_scaling,
         new_rotation,
+        new_tmp_radii,
         new_kf_ids=None,
         new_n_obs=None,
     ):
@@ -617,6 +644,7 @@ class GaussianModel:
             "opacity": new_opacities,
             "scaling": new_scaling,
             "rotation": new_rotation,
+            "tmp_radii": new_tmp_radii,
         }
 
         # The cat_tensors_to_optimizer updates the self.optimizer interal
@@ -631,7 +659,8 @@ class GaussianModel:
         self._opacity = optimizable_tensors["opacity"]
         self._scaling = optimizable_tensors["scaling"]
         self._rotation = optimizable_tensors["rotation"]
-
+        
+        self.tmp_radii = torch.cat((self.tmp_radii, new_tmp_radii))
         self.xyz_gradient_accum = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
         self.denom = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
         self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
@@ -669,6 +698,7 @@ class GaussianModel:
         new_features_dc = self._features_dc[selected_pts_mask].repeat(N, 1, 1)
         new_features_rest = self._features_rest[selected_pts_mask].repeat(N, 1, 1)
         new_opacity = self._opacity[selected_pts_mask].repeat(N, 1)
+        new_tmp_radii = self.tmp_radii[selected_pts_mask].repeat(N)
 
         new_kf_id = self.unique_kfIDs[selected_pts_mask.cpu()].repeat(N)
         new_n_obs = self.n_obs[selected_pts_mask.cpu()].repeat(N)
@@ -681,6 +711,7 @@ class GaussianModel:
             new_opacity,
             new_scaling,
             new_rotation,
+            new_tmp_radii,
             new_kf_ids=new_kf_id,
             new_n_obs=new_n_obs,
         )
@@ -711,6 +742,8 @@ class GaussianModel:
         new_opacities = self._opacity[selected_pts_mask]
         new_scaling = self._scaling[selected_pts_mask]
         new_rotation = self._rotation[selected_pts_mask]
+        
+        new_tmp_radii = self.tmp_radii[selected_pts_mask]
 
         new_kf_id = self.unique_kfIDs[selected_pts_mask.cpu()]
         new_n_obs = self.n_obs[selected_pts_mask.cpu()]
@@ -721,13 +754,16 @@ class GaussianModel:
             new_opacities,
             new_scaling,
             new_rotation,
+            new_tmp_radii,
             new_kf_ids=new_kf_id,
             new_n_obs=new_n_obs,
         )
 
-    def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
+    def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size, radii):
         grads = self.xyz_gradient_accum / self.denom
         grads[grads.isnan()] = 0.0
+        
+        self.tmp_radii = radii
 
         self.densify_and_clone(grads, max_grad, extent)
         self.densify_and_split(grads, max_grad, extent)
@@ -741,6 +777,10 @@ class GaussianModel:
                 torch.logical_or(prune_mask, big_points_vs), big_points_ws
             )
         self.prune_points(prune_mask)
+        tmp_radii = self.tmp_radii
+        self.tmp_radii = torch.empty(0, device="cuda")
+        
+        torch.cuda.empty_cache()
 
     def add_densification_stats(self, viewspace_point_tensor, update_filter):
         self.xyz_gradient_accum[update_filter] += torch.norm(

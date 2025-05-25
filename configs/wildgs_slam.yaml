@@ -25,7 +25,7 @@ mapping:
     init_gaussian_th: 0.005
     init_gaussian_extent: 30
     mapping_itr_num: 450
-    gaussian_update_every: 1500 # we prune and densify once every 1500 iterations with an offset of 500.
+    gaussian_update_every: 500 # we prune and densify once every 1500 iterations with an offset of 500.
     gaussian_update_offset: 500
     gaussian_th: 0.7 # used in densify and prune - minimum opacity to be kept
     gaussian_extent: 1.0 # used in densify and prune. We prune points with larger 3d scale than 0.1 * gaussian_extent
@@ -157,5 +157,6 @@ data:
 dataset: 'tumrgbd'
 
 early_stop:
+  enabled: True
   patience: 50
   delta: 0.0001

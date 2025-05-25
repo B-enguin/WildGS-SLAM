@@ -15,13 +15,14 @@ from src.utils.eval_traj import kf_traj_eval, full_traj_eval
 from src.utils.datasets import BaseDataset
 from src.tracker import Tracker
 from src.mapper import Mapper
+# from src.mapper_speedy import Mapper
 from src.backend import Backend
 from src.utils.dyn_uncertainty.uncertainty_model import generate_uncertainty_mlp
 from src.utils.datasets import RGB_NoPose
 from src.gui import gui_utils, slam_gui
 from thirdparty.gaussian_splatting.scene.gaussian_model import GaussianModel
 
-from torch.profiler import profile, ProfilerActivity, record_function
+# from torch.profiler import profile, ProfilerActivity, record_function
 
 class SLAM:
     def __init__(self, cfg, stream: BaseDataset):
@@ -123,8 +124,8 @@ class SLAM:
         while self.all_trigered < self.num_running_thread:
             pass
 
-        with record_function("Mapping"):
-            self.mapper.run()
+        # with record_function("Mapping"):
+        self.mapper.run()
         # self.mapper.run()
         self.printer.print("Mapping Done!", FontColor.MAPPER)
 
@@ -278,61 +279,61 @@ class SLAM:
     def run(self):
         start_time = time.time() 
         
-        with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
-                record_shapes=True, 
-                profile_memory=True, 
-                use_cuda=torch.cuda.is_available(), 
-                with_stack=True,
-                with_modules=True,
-            ) as prof:
+        # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
+        #         record_shapes=True, 
+        #         profile_memory=True, 
+        #         use_cuda=torch.cuda.is_available(), 
+        #         with_stack=True,
+        #         with_modules=True,
+        #     ) as prof:
 
-            self.printer.print("SLAM Triggered!", FontColor.INFO)
+        self.printer.print("SLAM Triggered!", FontColor.INFO)
 
-                     
-            m_pipe, t_pipe = mp.Pipe()
+                    
+        m_pipe, t_pipe = mp.Pipe()
 
-            q_main2vis = mp.Queue() if self.cfg['gui'] else None
-            q_vis2main = mp.Queue() if self.cfg['gui'] else None
+        q_main2vis = mp.Queue() if self.cfg['gui'] else None
+        q_vis2main = mp.Queue() if self.cfg['gui'] else None
 
-            processes = [
-                mp.Process(target=self.tracking, args=(t_pipe,)),
-                mp.Process(target=self.mapping, args=(m_pipe,q_main2vis,q_vis2main)),
-            ]
-            self.num_running_thread[0] += len(processes)
-            for p in processes:
-                p.start()
+        processes = [
+            mp.Process(target=self.tracking, args=(t_pipe,)),
+            mp.Process(target=self.mapping, args=(m_pipe,q_main2vis,q_vis2main)),
+        ]
+        self.num_running_thread[0] += len(processes)
+        for p in processes:
+            p.start()
 
-            if self.cfg['gui']:
-                time.sleep(5)
-                pipeline_params = munchify(self.cfg["mapping"]["pipeline_params"])
-                bg_color = [0, 0, 0]
-                background = torch.tensor(
-                    bg_color, dtype=torch.float32, device=self.device
-                )
-                gaussians = GaussianModel(self.cfg['mapping']['model_params']['sh_degree'], config=self.cfg)
+        if self.cfg['gui']:
+            time.sleep(5)
+            pipeline_params = munchify(self.cfg["mapping"]["pipeline_params"])
+            bg_color = [0, 0, 0]
+            background = torch.tensor(
+                bg_color, dtype=torch.float32, device=self.device
+            )
+            gaussians = GaussianModel(self.cfg['mapping']['model_params']['sh_degree'], config=self.cfg)
 
-                params_gui = gui_utils.ParamsGUI(
-                    pipe=pipeline_params,
-                    background=background,
-                    gaussians=gaussians,
-                    q_main2vis=q_main2vis,
-                    q_vis2main=q_vis2main,
-                )
-                gui_process = mp.Process(target=slam_gui.run, args=(params_gui,))
-                gui_process.start()
-                self.num_running_thread[0] += 1
+            params_gui = gui_utils.ParamsGUI(
+                pipe=pipeline_params,
+                background=background,
+                gaussians=gaussians,
+                q_main2vis=q_main2vis,
+                q_vis2main=q_vis2main,
+            )
+            gui_process = mp.Process(target=slam_gui.run, args=(params_gui,))
+            gui_process.start()
+            self.num_running_thread[0] += 1
 
 
-            for p in processes:
-                p.join()
+        for p in processes:
+            p.join()
 
-            self.printer.terminate()
+        self.printer.terminate()
 
-            for process in mp.active_children():
-                process.terminate()
-                process.join()
-        prof.export_chrome_trace("./profiles/trace_regularGS_earlystop.json")
-        # prof.export_chrome_trace("./profiles/trace_speedysplat_earlystop.json")
+        for process in mp.active_children():
+            process.terminate()
+            process.join()
+        # prof.export_chrome_trace("./profiles/trace_regularGS_noinv.json")
+        # prof.export_chrome_trace("./profiles/trace_speedysplat_noinv.json")
         
         end_time = time.time()
         elapsed = end_time - start_time

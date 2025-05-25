@@ -3,4 +3,4 @@ scene: bonn_balloon
 
 data:
   input_folder: /work/courses/3dv/23-2/datasets/Bonn/rgbd_bonn_balloon
-  output: /work/courses/3dv/23-2/precomputed
+  output: ./output
