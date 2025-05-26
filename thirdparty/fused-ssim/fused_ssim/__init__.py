@@ -1,7 +1,7 @@
 from typing import NamedTuple
 import torch.nn as nn
 import torch
-from fused_ssim_cuda import fusedssim, fusedssim_backward
+from fused_ssim_cuda import fusedssim, fusedssim_backward, fusedssimGo
 
 allowed_padding = ["same", "valid"]
 
@@ -40,3 +40,17 @@ def fused_ssim(img1, img2, padding="same", train=True):
     img1 = img1.contiguous()
     map = FusedSSIMMap.apply(C1, C2, img1, img2, padding, train)
     return map.mean()
+
+def fused_ssim_Go(img1, img2, padding="same"):
+    C1 = 0.01 ** 2
+    C2 = 0.03 ** 2
+
+    assert padding in allowed_padding
+
+    img1 = img1.contiguous()
+    map = fusedssimGo(C1, C2, img1, img2)
+
+    if padding == "valid":
+        ssim_map = ssim_map[:, :, 5:-5, 5:-5]
+
+    return map
