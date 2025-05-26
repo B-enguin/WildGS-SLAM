@@ -84,6 +84,13 @@ class Camera(nn.Module):
 
         self.features = features
 
+        self.world_view_transform_mat = getWorld2View2(self.R, self.T).transpose(0, 1)
+        self.full_proj_transform_mat = (
+            self.world_view_transform_mat.unsqueeze(0).bmm(
+                self.projection_matrix.unsqueeze(0)
+            )
+        ).squeeze(0)
+
     @staticmethod
     def init_from_dataset(dataset, data, projection_matrix, full_resol=False):
         if not full_resol:
@@ -136,15 +143,19 @@ class Camera(nn.Module):
 
     @property
     def world_view_transform(self):
-        return getWorld2View2(self.R, self.T).transpose(0, 1)
+        return self.world_view_transform_mat
+
+        # return getWorld2View2(self.R, self.T).transpose(0, 1)
 
     @property
     def full_proj_transform(self):
-        return (
-            self.world_view_transform.unsqueeze(0).bmm(
-                self.projection_matrix.unsqueeze(0)
-            )
-        ).squeeze(0)
+        return self.full_proj_transform_mat
+
+        # return (
+        #     self.world_view_transform.unsqueeze(0).bmm(
+        #         self.projection_matrix.unsqueeze(0)
+        #     )
+        # ).squeeze(0)
 
     @property
     def camera_center(self):
@@ -153,6 +164,12 @@ class Camera(nn.Module):
     def update_RT(self, R, t):
         self.R = R.to(device=self.device)
         self.T = t.to(device=self.device)
+        self.world_view_transform_mat = getWorld2View2(self.R, self.T).transpose(0, 1)
+        self.full_proj_transform_mat = (
+            self.world_view_transform_mat.unsqueeze(0).bmm(
+                self.projection_matrix.unsqueeze(0)
+            )
+        ).squeeze(0)
 
     def compute_grad_mask(self, config):
         edge_threshold = config["mapping"]["Training"]["edge_threshold"]

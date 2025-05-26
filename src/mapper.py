@@ -151,6 +151,9 @@ class Mapper(object):
         self.frame_idxs = []  # the indices of keyframes in the original frame sequence
         self.video_idxs = []  # keyframe numbering (I sometimes call it kf_idx)
 
+        # Send Initial continue
+        self.pipe.send("continue")
+
         start = time.time()
         while True:
             if self.config['gui']:

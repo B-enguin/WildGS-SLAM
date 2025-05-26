@@ -63,10 +63,10 @@ class Tracker:
             if curr_kf_idx != prev_kf_idx and self.frontend.is_initialized:
                 if self.video.counter.value == self.frontend.warmup:
                     ## We just finish the initialization
+                    self.pipe.recv()
                     self.pipe.send({"is_keyframe":True, "video_idx":curr_kf_idx,
                                     "timestamp":timestamp, "just_initialized": True, 
                                     "end":False})
-                    self.pipe.recv()
                     self.frontend.initialize_second_stage()
                 else:
                     if self.enable_online_ba and curr_kf_idx >= prev_ba_idx + self.ba_freq:
@@ -74,15 +74,16 @@ class Tracker:
                         self.printer.print(f"Online BA at {curr_kf_idx}th keyframe, frame index: {timestamp}",FontColor.TRACKER)
                         self.online_ba.dense_ba(2)
                         prev_ba_idx = curr_kf_idx
+                    self.pipe.recv()
                     # inform the mapper that the estimation of current pose and depth is finished
                     self.pipe.send({"is_keyframe":True, "video_idx":curr_kf_idx,
                                     "timestamp":timestamp, "just_initialized": False, 
                                     "end":False})
-                    self.pipe.recv()
 
             prev_kf_idx = curr_kf_idx
             self.printer.update_pbar()
 
+        self.pipe.recv()
         self.pipe.send({"is_keyframe":True, "video_idx":None,
                         "timestamp":None, "just_initialized": False, 
                         "end":True})
