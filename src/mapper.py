@@ -47,6 +47,8 @@ from src.utils.dyn_uncertainty.median_filter import MedianPool2d
 from src.utils.plot_utils import create_gif_from_directory
 from src.gui import gui_utils
 
+from src.utils.slam_utils import ssim
+
 class Mapper(object):
     """
     Mapper thread.
@@ -1559,8 +1561,13 @@ class Mapper(object):
         psnr_score = psnr(
             (rendered_img[mask]).unsqueeze(0), (gt_image[mask]).unsqueeze(0)
         )
+        ssim_score = ssim(
+            (rendered_img[mask]).unsqueeze(0).unsqueeze(0),(gt_image[mask]).unsqueeze(0).unsqueeze(0),
+        )
         with open("psnr.txt", "a") as f:
             f.write(f"{psnr_score.item()},")
+        with open("ssim.txt", "a") as f:
+            f.write(f"{ssim_score.item()},")
         diff_rgb=np.abs(gt - pred)
         diff_depth_l1 = torch.abs(rendered_depth.detach().cpu() - gt_depth)
         diff_depth_l1 = diff_depth_l1 * (gt_depth > 0)
