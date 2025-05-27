@@ -76,6 +76,9 @@ class Tracker:
                         prev_ba_idx = curr_kf_idx
                     self.pipe.recv()
                     # inform the mapper that the estimation of current pose and depth is finished
+                    self.printer.print(f"Waiting for mapper to send continue, frame index: {timestamp}",FontColor.TRACKER)
+                    self.pipe.recv()
+                    self.printer.print(f"Received continue from mapper, sending frame index: {timestamp}",FontColor.TRACKER)
                     self.pipe.send({"is_keyframe":True, "video_idx":curr_kf_idx,
                                     "timestamp":timestamp, "just_initialized": False, 
                                     "end":False})
