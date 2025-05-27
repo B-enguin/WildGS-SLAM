@@ -1,10 +1,34 @@
 verbose: True
 gui: False
-stride: 1            # use every X image from the dataset 
-max_frames: -1       # use the first X images from the dataset, -1 means using all
+stride: 1            # use every X image from the dataset
+max_frames: -1   # use the first X images from the dataset, -1 means using all
 setup_seed: 43
-fast_mode: False
 device: "cuda:0"
+fast_mode: True
+
+dpvo:
+  alpha1: 0.2
+  alpha2: .05
+  c_depth_reg: True
+  BETA_WEIGHT: False
+  BUFFER_SIZE: 2048
+  CENTROID_SEL_STRAT: 'RANDOM'
+  PATCHES_PER_FRAME: 96
+  REMOVAL_WINDOW: 22
+  OPTIMIZATION_WINDOW: 10
+  PATCH_LIFETIME: 13
+  KEYFRAME_INDEX: 4
+  KEYFRAME_THRESH: 5.0
+  MOTION_MODEL: 'DAMPED_LINEAR'
+  MOTION_DAMPING: 0.5
+  MIXED_PRECISION: True
+  LOOP_CLOSURE: True
+  BACKEND_THRESH: 64.0
+  MAX_EDGE_AGE: 1000
+  GLOBAL_OPT_FREQ: 15
+  CLASSIC_LOOP_CLOSURE: False
+  LOOP_CLOSE_WINDOW_SIZE: 5
+  LOOP_RETR_THRESH: 0.05
 
 mapping:
   online_plotting: False # render and save images online
@@ -56,7 +80,7 @@ mapping:
 
   model_params:
     sh_degree: 0
-    
+
   pipeline_params:
     convert_SHs_python: False
     compute_cov3D_python: False
@@ -139,7 +163,7 @@ cam:
   W_out: 640
 
 mono_prior:
-  # Metric depth model, only support: 
+  # Metric depth model, only support:
   #     metric3d_vit_small, metric3d_vit_large and metric3d_vit_giant2
   #     dpt2_{vits,vitb,vitl}_{hypersim,vkitti}_{20,80}  (see src/utils/mono_priors/metric_depth_estimators.py for detail)
   #             e.g. dpt2_vitl_hypersim_20, dpt2_vitl_vkitti_80

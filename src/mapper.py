@@ -1,4 +1,6 @@
 import os
+import time
+
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -149,7 +151,8 @@ class Mapper(object):
         # self.video.timestamp[video_idx[i]] = self.frame_idxs[i]
         self.frame_idxs = []  # the indices of keyframes in the original frame sequence
         self.video_idxs = []  # keyframe numbering (I sometimes call it kf_idx)
-
+        
+        start = time.time()
         while True:
             if self.config['gui']:
                 if self.q_vis2main.empty():
@@ -265,7 +268,10 @@ class Mapper(object):
                 self._send_to_gui(video_idx)
 
             self.pipe.send("continue")
-
+        torch.cuda.synchronize()
+        end = time.time()
+        print(f'TOTOAL TIME MAPPING {(end-start):1.3f}')
+        self.printer.print(f'TOTOAL TIME MAPPING {(end-start):1.3f}')
     """
     Utility functions
     """

@@ -158,6 +158,9 @@ class DepthVideo:
         with self.get_lock():
             self.__item_setter(self.counter.value, item)
 
+    def set_item(self, index, item):
+        with self.get_lock():
+            self.__item_setter(index, item)
 
     ### geometric operations ###
 

@@ -2,13 +2,10 @@ import os
 import torch
 import numpy as np
 import time
-from collections import OrderedDict
 import torch.multiprocessing as mp
 from munch import munchify
 
-from src.modules.droid_net import DroidNet
 from src.depth_video import DepthVideo
-from src.trajectory_filler import PoseTrajectoryFiller
 from src.utils.common import setup_seed, update_cam
 from src.utils.Printer import Printer, FontColor
 from src.utils.eval_traj import kf_traj_eval, full_traj_eval
@@ -19,6 +16,7 @@ from src.backend import Backend
 from src.utils.dyn_uncertainty.uncertainty_model import generate_uncertainty_mlp
 from src.utils.datasets import RGB_NoPose
 from src.gui import gui_utils, slam_gui
+from src.utils.mono_priors.img_feature_extractors import get_feature_extractor
 from thirdparty.gaussian_splatting.scene.gaussian_model import GaussianModel
 
 class SLAM:
@@ -34,15 +32,10 @@ class SLAM:
 
         self.H, self.W, self.fx, self.fy, self.cx, self.cy = update_cam(cfg)
 
-        self.droid_net: DroidNet = DroidNet()
 
         self.printer = Printer(
             len(stream)
         )  # use an additional process for printing all the info
-
-        self.load_pretrained(cfg)
-        self.droid_net.to(self.device).eval()
-        self.droid_net.share_memory()
 
         self.num_running_thread = torch.zeros((1)).int()
         self.num_running_thread.share_memory_()
@@ -53,46 +46,30 @@ class SLAM:
             n_features = self.cfg["mapping"]["uncertainty_params"]["feature_dim"]
             self.uncer_network = generate_uncertainty_mlp(n_features)
             self.uncer_network.share_memory()
+
+            self.feat_extractor = get_feature_extractor(self.cfg)
+            self.feat_extractor.share_memory()
         else:
             self.uncer_network = None
+            self.feat_extractor = None
             if self.cfg["tracking"]["uncertainty_params"]["activate"]:
                 raise ValueError(
                     "uncertainty estimation cannot be activated on tracking while not on mapping"
                 )
 
         self.video = DepthVideo(cfg, self.printer, uncer_network=self.uncer_network)
-        self.ba = Backend(self.droid_net, self.video, self.cfg)
-
-        # post processor - fill in poses for non-keyframes
-        self.traj_filler = PoseTrajectoryFiller(
-            cfg=cfg,
-            net=self.droid_net,
-            video=self.video,
-            printer=self.printer,
-            device=self.device,
-        )
-
-        self.tracker: Tracker = None
-        self.mapper: Mapper = None
         self.stream = stream
 
-    def load_pretrained(self, cfg):
-        droid_pretrained = cfg["tracking"]["pretrained"]
-        state_dict = OrderedDict(
-            [
-                (k.replace("module.", ""), v)
-                for (k, v) in torch.load(droid_pretrained, weights_only=True).items()
-            ]
-        )
-        state_dict["update.weight.2.weight"] = state_dict["update.weight.2.weight"][:2]
-        state_dict["update.weight.2.bias"] = state_dict["update.weight.2.bias"][:2]
-        state_dict["update.delta.2.weight"] = state_dict["update.delta.2.weight"][:2]
-        state_dict["update.delta.2.bias"] = state_dict["update.delta.2.bias"][:2]
-        self.droid_net.load_state_dict(state_dict)
-        self.droid_net.eval()
-        self.printer.print(
-            f"Load droid pretrained checkpoint from {droid_pretrained}!", FontColor.INFO
-        )
+        # TODO renable use dpvo version
+        # post processor - fill in poses for non-keyframes TODO Reanable or Us
+        # self.traj_filler = PoseTrajectoryFiller(
+        #     cfg=cfg,
+        #     net=self.droid_net,
+        #     video=self.video,
+        #     printer=self.printer,
+        #     device=self.device,
+        # )
+
 
     def tracking(self, pipe):
         self.tracker = Tracker(self, pipe)
@@ -144,7 +121,10 @@ class SLAM:
 
     def terminate(self):
         """fill poses for non-keyframe images and evaluate"""
-
+        self.save_dir = self.save_dir + f'/a1-{self.cfg["dpvo"]["alpha1"]:1.5f}-a2-{self.cfg["dpvo"]["alpha2"]:1.5f}-C-{self.cfg["dpvo"]["c_depth_reg"]}'.replace('.','_')
+        if not os.path.exists(self.save_dir):
+            os.makedirs(self.save_dir)
+            
         if (
             self.cfg["tracking"]["backend"]["final_ba"]
             and self.cfg["mapping"]["eval_before_final_ba"]
@@ -161,15 +141,16 @@ class SLAM:
                         self.printer,
                     )
                 except Exception as e:
+                    self.printer.print('got excpetion kf_traj_eval')
                     self.printer.print(e, FontColor.ERROR)
-
+            self.printer.print('saving plots before refine')
             self.mapper.save_all_kf_figs(
                 self.save_dir,
                 iteration="before_refine",
             )
-
-        if self.cfg["tracking"]["backend"]["final_ba"]:
-            self.backend()
+        # TODO run dpvo backend final bundle adjustment
+        # if self.cfg["tracking"]["backend"]["final_ba"]:
+            # self.backend()
 
         self.video.save_video(f"{self.save_dir}/video.npz")
         if not isinstance(self.stream, RGB_NoPose):
@@ -183,42 +164,42 @@ class SLAM:
                     self.printer,
                 )
             except Exception as e:
+                self.printer.print('got kf_traj_eval')
                 self.printer.print(e, FontColor.ERROR)
-
-        if self.cfg["tracking"]["backend"]["final_ba"]:
-            self.mapper.final_refine(
-                iters=self.cfg["mapping"]["final_refine_iters"]
-            )  # this performs a set of optimizations with RGBD loss to correct
-
+        
+        # TODO reanable
+        # if self.cfg["tracking"]["backend"]["final_ba"]:
+        #     self.mapper.final_refine(
+        #         iters=self.cfg["mapping"]["final_refine_iters"]
+        #     )  # this performs a set of optimizations with RGBD loss to correct
+        #
         # Evaluate the metrics
         self.mapper.save_all_kf_figs(
             self.save_dir,
             iteration="after_refine",
         )
 
-        ## Not used, see head comments of the function
-        # self._eval_depth_all(ate_statistics, global_scale, r_a, t_a)
-
-        # Regenerate feature extractor for non-keyframes
-        self.traj_filler.setup_feature_extractor()
-        full_traj_eval(
-            self.traj_filler,
-            self.mapper,
-            f"{self.save_dir}/traj",
-            "full_traj",
-            self.stream,
-            self.logger,
-            self.printer,
-            self.cfg['fast_mode'],
-        )
-
-        self.mapper.gaussians.save_ply(f"{self.save_dir}/final_gs.ply")
-
-        if self.cfg["mapping"]["uncertainty_params"]["activate"]:
-            torch.save(
-                self.mapper.uncer_network.state_dict(),
-                self.save_dir + "/uncertainty_mlp_weight.pth",
-            )
+        # ## Not used, see head comments of the function
+        # # self._eval_depth_all(ate_statistics, global_scale, r_a, t_a)
+        #
+        # # Regenerate feature extractor for non-keyframes
+        # full_traj_eval(
+        #     self.traj_filler,
+        #     self.mapper,
+        #     f"{self.save_dir}/traj",
+        #     "full_traj",
+        #     self.stream,
+        #     self.logger,
+        #     self.printer,
+        # )
+        #
+        # self.mapper.gaussians.save_ply(f"{self.save_dir}/final_gs.ply")
+        #
+        # if self.cfg["mapping"]["uncertainty_params"]["activate"]:
+        #     torch.save(
+        #         self.mapper.uncer_network.state_dict(),
+        #         self.save_dir + "/uncertainty_mlp_weight.pth",
+        #     )
 
         self.printer.print("Metrics Evaluation Done!", FontColor.EVAL)
 
