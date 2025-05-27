@@ -1102,8 +1102,7 @@ class Mapper(object):
                     prob[view_idx] = cur_window_prob * iters / (len(current_window))
         prob /= prob.sum()
 
-        best_loss = torch.tensor([1e10], device=self.device)
-        best_loss_iter = 0
+        previous_losses = []
         for cur_iter in range(iters):
             self.iteration_count += 1
             self.iterations_after_densify_or_reset += 1
@@ -1250,18 +1249,24 @@ class Mapper(object):
 
             # Early Stopping
             if self.config["early_stop"]["enabled"]:
-                if loss_mapping < best_loss - self.config['early_stop']['delta']:
-                    best_loss = loss_mapping
-                    best_loss_iter = cur_iter
-                
-                if cur_iter - best_loss_iter > self.config['early_stop']['patience']:
-                    self.printer.print(
-                        f"Early stopping at iteration {cur_iter} with loss {loss_mapping.item()}",
-                        FontColor.MAPPER,
-                    )
-                    with torch.no_grad():
-                        self._update_occ_aware_visibility(current_window)
-                    break
+                if len(previous_losses) >= self.config['early_stop']['window_size']:
+                    previous_losses.pop(0)
+                previous_losses.append(loss_mapping.item())
+
+                var = np.var(previous_losses)
+
+                with open("variance.txt", "a") as f:
+                    f.write(f"Iteration {cur_iter}, Variance: {var}\n")
+
+                if len(previous_losses) == self.config['early_stop']['window_size']:
+                    if var < self.config['early_stop']['delta']:
+                        self.printer.print(
+                            f"Early stopping at iteration {cur_iter} with variance {var}",
+                            FontColor.MAPPER,
+                        )
+                        with torch.no_grad():
+                            self._update_occ_aware_visibility(current_window)
+                        break
 
         # Online plotting
         if self.online_plotting:
@@ -1286,8 +1291,7 @@ class Mapper(object):
                 random_viewpoint_stack.append(viewpoint)
                 random_viewpoint_kf_idx_stack.append(kf_idx)
 
-        best_loss = torch.tensor([1e10], device=self.device)
-        best_loss_iter = 0
+        previous_losses = []
         for cur_iter in tqdm(range(iters)):
             self.iteration_count += 1
             self.iterations_after_densify_or_reset += 1
@@ -1414,16 +1418,19 @@ class Mapper(object):
 
             # Early Stopping
             if self.config["fast_mode"]:
-                if loss_mapping < best_loss - self.config['early_stop']['delta']:
-                    best_loss = loss_mapping
-                    best_loss_iter = cur_iter
-                
-                if cur_iter - best_loss_iter > self.config['early_stop']['patience']:
-                    self.printer.print(
-                        f"Early stopping at iteration {cur_iter} with loss {loss_mapping.item()}",
-                        FontColor.MAPPER,
-                    )
-                    break
+                if len(previous_losses) >= self.config['early_stop']['window_size']:
+                    previous_losses.pop(0)
+                previous_losses.append(loss_mapping.item())
+
+                var = np.var(previous_losses)
+
+                if len(previous_losses) == self.config['early_stop']['window_size']:
+                    if var < self.config['early_stop']['delta']:
+                        self.printer.print(
+                            f"Early stopping at iteration {cur_iter} with variance {var}",
+                            FontColor.MAPPER,
+                        )
+                        break
 
         if self.vis_uncertainty_online:
             self._vis_uncertainty_mask_all(is_final=True)
@@ -1551,6 +1558,8 @@ class Mapper(object):
         psnr_score = psnr(
             (rendered_img[mask]).unsqueeze(0), (gt_image[mask]).unsqueeze(0)
         )
+        with open("psnr.txt", "a") as f:
+            f.write(f"{psnr_score.item()},")
         diff_rgb=np.abs(gt - pred)
         diff_depth_l1 = torch.abs(rendered_depth.detach().cpu() - gt_depth)
         diff_depth_l1 = diff_depth_l1 * (gt_depth > 0)
