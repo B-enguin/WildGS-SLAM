@@ -1,4 +1,6 @@
 import os
+import time
+
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -152,7 +154,8 @@ class Mapper(object):
 
         # Send Initial continue
         self.pipe.send("continue")
-
+        
+        start = time.time()
         while True:
             if self.config['gui']:
                 if self.q_vis2main.empty():
@@ -268,7 +271,10 @@ class Mapper(object):
                 self._send_to_gui(video_idx)
 
             self.pipe.send("continue")
-
+        torch.cuda.synchronize()
+        end = time.time()
+        print(f'TOTAL TIME MAPPING {(end-start):1.3f}')
+        self.printer.print(f'TOTAL TIME MAPPING {(end-start):1.3f}', FontColor.MAPPER)
     """
     Utility functions
     """
@@ -1586,6 +1592,7 @@ class Mapper(object):
         save_path = os.path.join(plot_dir, f"video_idx_{keyframe_idx}_kf_idx_{frame_idx}{suffix}.png")
         plt.savefig(save_path, bbox_inches='tight')
         plt.close()
+        return psnr_score.item()
 
     def save_all_kf_figs(
         self,
@@ -1608,9 +1615,13 @@ class Mapper(object):
 
         plot_dir = os.path.join(save_dir, "plots_" + iteration)
         mkdir_p(plot_dir)
-
+        
+        psnr_s = []
         for kf_idx in video_idxs:
-            self.save_fig_everything(kf_idx, plot_dir)
+            psnr = self.save_fig_everything(kf_idx, plot_dir)
+            psnr_s.append(float(psnr))
+        self.printer.print(f"PSNR {np.mean(np.array(psnr_s))}", FontColor.MAPPER)
+        print(f"PSNR {np.mean(np.array(psnr_s))}")
         # Create gif
         create_gif_from_directory(plot_dir, plot_dir + '/output.gif', online=True)
 
