@@ -1,16 +1,19 @@
 import cv2
 import os
 import time
+from datetime import datetime
 
-# === CONFIGURATION ===
-# <-- Replace with your phone's IP stream URL
-STREAM_URL = "http://192.168.55.7:8080/video"
-SAVE_DIR = "captured_png_frames"
-CAPTURE_DURATION = 5       # seconds
+# Configuartion
+STREAM_URL = "http://192.168.130.60:8080/video"
+
+current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")  # Current time as folder name
+SAVE_DIR = os.path.join("datasets/android/", current_time)
+
+CAPTURE_DURATION = 10       # seconds
 FPS = 5                    # frames per second
 MAX_FRAMES = CAPTURE_DURATION * FPS
 
-# === SETUP ===
+# Set-up
 os.makedirs(SAVE_DIR, exist_ok=True)
 cap = cv2.VideoCapture(STREAM_URL)
 

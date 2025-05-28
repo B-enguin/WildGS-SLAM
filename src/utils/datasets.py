@@ -429,11 +429,30 @@ class RGB_NoPose(BaseDataset):
         self.color_paths = self.color_paths[:max_frames][::stride]
         self.n_img = len(self.color_paths)
 
+class AndroidDataset(BaseDataset):
+    def __init__(self, cfg, device='cuda:0'):
+        super(AndroidDataset, self).__init__(cfg, device)
+        self.color_paths = sorted(
+            glob.glob(f"{self.input_folder}/frame*.png")
+        )
+        self.depth_paths = None
+        self.poses = None
+
+        stride = cfg['stride']
+        max_frames = cfg['max_frames']
+        if max_frames < 0:
+            max_frames = len(self.color_paths)
+
+        self.color_paths = self.color_paths[:max_frames][::stride]
+        self.n_img = len(self.color_paths)
+        
+
 dataset_dict = {
     "replica": Replica,
     "scannet": ScanNet,
     "tumrgbd": TUM_RGBD,
     "bonn_dynamic": TUM_RGBD,
     "wild_slam_mocap": TUM_RGBD,
-    "wild_slam_iphone": RGB_NoPose
+    "wild_slam_iphone": RGB_NoPose,
+    "android": AndroidDataset
 }
