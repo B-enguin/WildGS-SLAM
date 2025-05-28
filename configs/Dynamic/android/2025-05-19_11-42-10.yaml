@@ -7,7 +7,7 @@ data:
   input_folder: ./datasets/android/2025-05-19_11-42-10
   output: ./output/android
 
-# Optionally override camera intrinsics if needed:
+# Optionally override camera intrinsics if needed: 
 # cam:
 #   H: 480
 #   W: 640
