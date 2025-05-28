@@ -16,7 +16,7 @@ mapping:
     uncer_depth_mult: 0.0 
 
 
-# These are their current iPhone intrinsics (TODO: UPDATE)
+# These are their current iPhone intrinsics (TODO: UPDATE) 
 cam:
   H: 1440 
   W: 1920 
