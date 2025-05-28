@@ -1026,7 +1026,11 @@ class Mapper(object):
                     self.gaussians.reset_opacity()
                     self.iterations_after_densify_or_reset = 0
 
-                self.gaussians.optimizer.step()
+                if self.config["mapping"]["opt_params"]["optimizer"] == "sparse_adam":
+                    visible = radii > 0
+                    self.gaussians.optimizer.step(visible, radii.shape[0])
+                else:
+                    self.gaussians.optimizer.step()
                 self.gaussians.optimizer.zero_grad(set_to_none=True)
                 self.gaussians.update_learning_rate(self.iteration_count)
                 self.keyframe_optimizers.step()
@@ -1213,7 +1217,11 @@ class Mapper(object):
                     gaussian_split = True
                     self.iterations_after_densify_or_reset = 0
 
-                self.gaussians.optimizer.step()
+                if self.config["mapping"]["opt_params"]["optimizer"] == "sparse_adam":
+                    visible = radii > 0
+                    self.gaussians.optimizer.step(visible, radii.shape[0])
+                else:
+                    self.gaussians.optimizer.step()
                 self.gaussians.optimizer.zero_grad(set_to_none=True)
                 self.gaussians.update_learning_rate(self.iteration_count)
                 self.keyframe_optimizers.step()
@@ -1376,7 +1384,11 @@ class Mapper(object):
             loss_mapping.backward()
 
             with torch.no_grad():
-                self.gaussians.optimizer.step()
+                if self.config["mapping"]["opt_params"]["optimizer"] == "sparse_adam":
+                    visible = radii > 0
+                    self.gaussians.optimizer.step(visible, radii.shape[0])
+                else:
+                    self.gaussians.optimizer.step()
                 self.gaussians.optimizer.zero_grad(set_to_none=True)
                 self.gaussians.update_learning_rate(self.iteration_count)
                 # Optimize the exposure compensation
