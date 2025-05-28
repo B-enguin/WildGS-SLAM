@@ -1,0 +1,20 @@
+inherit_from: ./configs/Dynamic/android/android.yaml    # replace with a new android.yaml later
+# inherit from: ./configs/Dynamic/android/2023-05-19_11-42-10.yaml
+
+scene: 2025-05-19_11-42-10
+
+data:
+  input_folder: ./datasets/android/2025-05-19_11-42-10
+  output: ./output/android
+
+# Optionally override camera intrinsics if needed:
+# cam:
+#   H: 480
+#   W: 640
+#   fx: ...
+#   fy: ...
+#   cx: ...
+#   cy: ...
+#   distortion: [...]
+#   H_out: 384
+#   W_out: 512
