@@ -62,7 +62,6 @@ from yacs.config import CfgNode
 from lietorch import SE3
 import torch.nn.functional as F
 
-from src.csv_profiler import CsvProfiler
 import torch
 from multiprocessing.connection import Connection
 from src.utils.datasets import BaseDataset, load_metric_depth
@@ -75,7 +74,6 @@ import numpy as np
 
 class Tracker:
     def __init__(self, slam, pipe: Connection):
-        self.profiler = CsvProfiler('tracker')
         self.cfg = slam.cfg
         self.device = self.cfg['device']
         self.net = None
