@@ -24,3 +24,11 @@ fusedssim_backward(
     torch::Tensor &dm_dsigma1_sq,
     torch::Tensor &dm_dsigma12
 );
+
+torch::Tensor
+fusedssimGo(
+    float C1,
+    float C2,
+    torch::Tensor &img1,
+    torch::Tensor &img2
+);

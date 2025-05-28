@@ -1083,6 +1083,7 @@ class Mapper(object):
                     prob[view_idx] = cur_window_prob * iters / (len(current_window))
         prob /= prob.sum()
 
+        previous_losses = []
         for cur_iter in range(iters):
             self.iteration_count += 1
             self.iterations_after_densify_or_reset += 1
@@ -1223,6 +1224,27 @@ class Mapper(object):
 
             self.frame_count_log[viewpoint_kf_idx_stack[cam_idx]] += 1
 
+            # Early Stopping
+            if self.config["early_stop"]["enabled"]:
+                if len(previous_losses) >= self.config['early_stop']['window_size']:
+                    previous_losses.pop(0)
+                previous_losses.append(loss_mapping.item())
+
+                var = np.var(previous_losses)
+
+                with open("variance.txt", "a") as f:
+                    f.write(f"Iteration {cur_iter}, Variance: {var}\n")
+
+                if len(previous_losses) == self.config['early_stop']['window_size']:
+                    if var < self.config['early_stop']['delta']:
+                        self.printer.print(
+                            f"Early stopping at iteration {cur_iter} with variance {var}",
+                            FontColor.MAPPER,
+                        )
+                        with torch.no_grad():
+                            self._update_occ_aware_visibility(current_window)
+                        break
+
         # Online plotting
         if self.online_plotting:
             plot_dir = self.save_dir + "/online_plots"
@@ -1246,7 +1268,8 @@ class Mapper(object):
                 random_viewpoint_stack.append(viewpoint)
                 random_viewpoint_kf_idx_stack.append(kf_idx)
 
-        for _ in tqdm(range(iters)):
+        previous_losses = []
+        for cur_iter in tqdm(range(iters)):
             self.iteration_count += 1
             self.iterations_after_densify_or_reset += 1
 
@@ -1365,6 +1388,22 @@ class Mapper(object):
 
             for kf_idx in random_viewpoint_kf_idxs:
                 self.frame_count_log[kf_idx] += 1
+
+            # Early Stopping
+            if self.config["fast_mode"]:
+                if len(previous_losses) >= self.config['early_stop']['window_size']:
+                    previous_losses.pop(0)
+                previous_losses.append(loss_mapping.item())
+
+                var = np.var(previous_losses)
+
+                if len(previous_losses) == self.config['early_stop']['window_size']:
+                    if var < self.config['early_stop']['delta']:
+                        self.printer.print(
+                            f"Early stopping at iteration {cur_iter} with variance {var}",
+                            FontColor.MAPPER,
+                        )
+                        break
 
         if self.vis_uncertainty_online:
             self._vis_uncertainty_mask_all(is_final=True)
