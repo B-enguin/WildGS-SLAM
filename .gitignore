@@ -17,4 +17,5 @@ temp/
 
 *.out
 
-configs/
+configs/result.json
+result.json
