@@ -17,7 +17,11 @@ temp/
 
 *.out
 
+<<<<<<< HEAD
 configs/result.json
 result.json
 result.json
 result.json
+=======
+configs/
+>>>>>>> ff21571c8a4210e68bdc4a6f6f132c2f4700aaae
