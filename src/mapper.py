@@ -1037,7 +1037,7 @@ class Mapper(object):
                 self.keyframe_optimizers.zero_grad(set_to_none=True)
                 if self.uncertainty_aware:
                     self.uncer_optimizer.step()
-                    self.uncer_optimizer.zero_grad()
+                    self.uncer_optimizer.zero_grad(set_to_none=True)
 
                 self.frame_count_log[kf_idx] += 1
 
@@ -1228,7 +1228,7 @@ class Mapper(object):
                 self.keyframe_optimizers.zero_grad(set_to_none=True)
                 if self.uncertainty_aware:
                     self.uncer_optimizer.step()
-                    self.uncer_optimizer.zero_grad()
+                    self.uncer_optimizer.zero_grad(set_to_none=True)
 
             self.frame_count_log[viewpoint_kf_idx_stack[cam_idx]] += 1
 
@@ -1396,7 +1396,7 @@ class Mapper(object):
                 self.keyframe_optimizers.zero_grad(set_to_none=True)
                 if self.uncertainty_aware:
                     self.uncer_optimizer.step()
-                    self.uncer_optimizer.zero_grad()
+                    self.uncer_optimizer.zero_grad(set_to_none=True)
 
             for kf_idx in random_viewpoint_kf_idxs:
                 self.frame_count_log[kf_idx] += 1
