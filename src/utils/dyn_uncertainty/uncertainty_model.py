@@ -74,4 +74,11 @@ class MLPNetwork(nn.Module):
 def generate_uncertainty_mlp(n_features: int) -> MLPNetwork:
     # Create and return an MLP network with the specified input dimensions
     network = MLPNetwork(input_dim=n_features).cuda()
+    
+    # Check if should be compiled
+    if torch.cuda.is_available():
+        device_cap = torch.cuda.get_device_capability()
+        if device_cap[0] >= 7:
+            network = torch.compile(network, mode="reduce-overhead")
+
     return network
