@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import glob
 import os
 import math
@@ -431,38 +433,66 @@ class RGB_NoPose(BaseDataset):
         self.color_paths = self.color_paths[:max_frames][::stride]
         self.n_img = len(self.color_paths)
         
-        
+import cv2, queue, threading, time
+
+class VideoCapture:
+
+  def __init__(self, name):
+    self.cap = cv2.VideoCapture(name)
+    self.q = queue.Queue()
+    t = threading.Thread(target=self._reader)
+    t.daemon = True
+    t.start()
+
+  # read frames as soon as they are available, keeping only most recent one
+  def _reader(self):
+    while True:
+      ret, frame = self.cap.read()
+      if not ret:
+        break
+      if not self.q.empty():
+        try:
+          self.q.get_nowait()   # discard previous (unprocessed) frame
+        except queue.Empty:
+          pass
+      self.q.put(frame)
+
+  def read(self):
+    return self.q.get()
+
 class LiveStreamDataset(BaseDataset):
     def __init__(self, cfg, device='cuda:0'):
         super(LiveStreamDataset, self).__init__(cfg, device)
         self.stream_url = cfg['data']['stream_url']
         if self.stream_url is not None:
-            self.cap = cv2.VideoCapture(self.stream_url)
+            self.cap = VideoCapture(self.stream_url)
+            
         # start = time.time()
         # while not self.cap.isOpened():
         #     if time.time() - start > 20:
         #         raise RuntimeError(f"Failed to open stream at {self.stream_url} after 10 seconds.")
         # print("Stream opened successfully")
-        self.color_paths = ["./datasets/rgb/frame_{:04d}.png".format(i) for i in range(300)]
+        self.color_paths = ["./datasets/rgb/frame_{:04d}.png".format(i) for i in range(1000)]
         # self.color_paths = sorted(glob.glob("./datasets/rgb/frame_*.png"))
         if not os.path.exists("./datasets/rgb"):
             os.makedirs("./datasets/rgb")
+        # self.last_t  = datetime.now()
         
 
     def __len__(self):
-        return 300  # virtually infinite stream
+        return 1000  # virtually infinite stream
 
     def __getitem__(self, index):
-        for n in range(10):
-            ret, frame = self.cap.read()
-        
-            print('got ret', ret)
-            if ret:
-                break
-            else:
-                time.sleep(0.1)
-            if n == 9:
-                raise RuntimeError("Failed to read from webcam.")
+
+        frame = self.cap.read()
+
+            
+        cv2.imshow('frame', frame)
+        cv2.waitKey(1)
+            
+        # if (self.last_t - datetime.now()).total_seconds() < .5:
+        #     time.sleep(0.5)
+        #     self.last_t = datetime.now()
         # print("./datasets/rgb/frame_{:04d}.png".format(index))
         # frame = cv2.imread("./datasets/rgb/frame_{:04d}.png".format(index))
 

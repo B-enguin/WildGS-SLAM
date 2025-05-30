@@ -268,6 +268,38 @@ class Mapper(object):
             if self.config['gui']:
                 self._send_to_gui(video_idx)
 
+
+            viewpoint = self.cameras[video_idx]
+            render_pkg = render(
+                viewpoint, self.gaussians, self.pipeline_params, self.background
+            )
+            (rendered_img, rendered_depth,) = (
+                render_pkg["render"].detach(),
+                render_pkg["depth"].detach(),
+            )
+            rendered_img = torch.clamp(rendered_img, 0.0, 1.0)
+            rendered_img = rendered_img.cpu().permute(1, 2, 0).numpy()
+
+            gt_image = viewpoint.original_image
+
+            gt = (gt_image.cpu().numpy().transpose((1, 2, 0)) * 255).astype(np.uint8)
+            gt = cv2.cvtColor(gt, cv2.COLOR_BGR2RGB)
+            rendered_img = cv2.cvtColor(rendered_img, cv2.COLOR_BGR2RGB)
+
+            if self.uncertainty_aware:
+                # Add plotting 2x4 grid with additional figures for uncertainty
+                # Estimated uncertainty map
+                uncertainty_map = self.get_viewpoint_uncertainty_no_grad(viewpoint)
+                uncertainty_map = uncertainty_map.cpu().squeeze(0)
+
+            cv2.imshow('gt', gt)
+            cv2.imshow('rendered_img', rendered_img)
+            # Convert to uint8 and apply colormap
+            uncertainty_map_normalized = ((uncertainty_map.numpy() - 0) / 5 * 255).astype(np.uint8)
+            colored_map = cv2.applyColorMap(uncertainty_map_normalized, cv2.COLORMAP_JET)
+            cv2.imshow('uncertainty_map', colored_map)
+            cv2.waitKey(1)
+
             self.pipe.send("continue")
 
     """
@@ -1592,10 +1624,6 @@ class Mapper(object):
         axs[0, 3].set_title("Uncertainty", fontsize=16)
         axs[1, 3].imshow(ssim_loss, cmap='jet', vmin=0, vmax=5)
         axs[1, 3].set_title("ssim_loss", fontsize=16)
-
-        cv2.imshow('gt', gt)
-        cv2.imshow('rendered', rendered_img)
-        cv2.waitKey(1)
         
         for i in range(2):
             for j in range(4):
