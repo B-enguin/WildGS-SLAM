@@ -46,9 +46,9 @@ if __name__ == '__main__':
 
     config.save_config(cfg, f'{output_dir}/cfg.yaml')
 
-    dataset = get_dataset(cfg)
+    # dataset = get_dataset(cfg)
 
-    slam = SLAM(cfg,dataset)
+    slam = SLAM(cfg,cfg)
     slam.run()
 
     end_time = strftime("%Y-%m-%d %H:%M:%S", gmtime())

@@ -22,7 +22,7 @@ from src.gui import gui_utils, slam_gui
 from thirdparty.gaussian_splatting.scene.gaussian_model import GaussianModel
 
 class SLAM:
-    def __init__(self, cfg, stream: BaseDataset):
+    def __init__(self, cfg, stream_cfg):
         super(SLAM, self).__init__()
         self.cfg = cfg
         self.device = cfg["device"]
@@ -37,7 +37,7 @@ class SLAM:
         self.droid_net: DroidNet = DroidNet()
 
         self.printer = Printer(
-            len(stream)
+            10000
         )  # use an additional process for printing all the info
 
         self.load_pretrained(cfg)
@@ -74,7 +74,7 @@ class SLAM:
 
         self.tracker: Tracker = None
         self.mapper: Mapper = None
-        self.stream = stream
+        self.stream = stream_cfg
 
     def load_pretrained(self, cfg):
         droid_pretrained = cfg["tracking"]["pretrained"]

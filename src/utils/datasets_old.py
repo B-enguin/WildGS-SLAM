@@ -8,7 +8,6 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 from thirdparty.gaussian_splatting.utils.graphics_utils import focal2fov
-import time
 
 def readEXR_onlydepth(filename):
     """
@@ -62,7 +61,6 @@ def load_img_feature(idx,path,suffix=''):
 
 
 def get_dataset(cfg, device='cuda:0'):
-    print('get_dataset', cfg['dataset'])
     return dataset_dict[cfg['dataset']](cfg, device=device)
 
 
@@ -430,51 +428,6 @@ class RGB_NoPose(BaseDataset):
 
         self.color_paths = self.color_paths[:max_frames][::stride]
         self.n_img = len(self.color_paths)
-        
-        
-class LiveStreamDataset(BaseDataset):
-    def __init__(self, cfg, device='cuda:0'):
-        super(LiveStreamDataset, self).__init__(cfg, device)
-        self.stream_url = cfg['data']['stream_url']
-        if self.stream_url is not None:
-            self.cap = cv2.VideoCapture(self.stream_url)
-        # start = time.time()
-        # while not self.cap.isOpened():
-        #     if time.time() - start > 20:
-        #         raise RuntimeError(f"Failed to open stream at {self.stream_url} after 10 seconds.")
-        # print("Stream opened successfully")
-        self.color_paths = ["./datasets/rgb/frame_{:04d}.png".format(i) for i in range(300)]
-        # self.color_paths = sorted(glob.glob("./datasets/rgb/frame_*.png"))
-        if not os.path.exists("./datasets/rgb"):
-            os.makedirs("./datasets/rgb")
-        
-
-    def __len__(self):
-        return 300  # virtually infinite stream
-
-    def __getitem__(self, index):
-        for n in range(10):
-            ret, frame = self.cap.read()
-        
-            print('got ret', ret)
-            if ret:
-                break
-            else:
-                time.sleep(0.1)
-            if n == 9:
-                raise RuntimeError("Failed to read from webcam.")
-        # print("./datasets/rgb/frame_{:04d}.png".format(index))
-        # frame = cv2.imread("./datasets/rgb/frame_{:04d}.png".format(index))
-
-
-        frame = cv2.resize(frame, (640, 360))  # or whatever your config says
-        cv2.imwrite(f"./datasets/rgb/frame_{index:04d}.png", frame)
-        frame = torch.from_numpy(frame).float().permute(2, 0, 1)[[2, 1, 0], :, :] / 255.0  # BGR → RGB
-        frame = frame.unsqueeze(dim=0)
-        return index, frame, None, None  # No depth or pose for livestream
-
-
-        
 
 dataset_dict = {
     "replica": Replica,
@@ -482,6 +435,5 @@ dataset_dict = {
     "tumrgbd": TUM_RGBD,
     "bonn_dynamic": TUM_RGBD,
     "wild_slam_mocap": TUM_RGBD,
-    "wild_slam_iphone": RGB_NoPose,
-    "livestream": LiveStreamDataset,
+    "wild_slam_iphone": RGB_NoPose
 }

@@ -6,6 +6,7 @@ from colorama import Fore, Style
 from multiprocessing.connection import Connection
 from src.utils.datasets import BaseDataset
 from src.utils.Printer import Printer,FontColor
+from src.utils.datasets import get_dataset
 class Tracker:
     def __init__(self, slam, pipe:Connection):
         self.cfg = slam.cfg
@@ -15,6 +16,7 @@ class Tracker:
         self.verbose = slam.verbose
         self.pipe = pipe
         self.output = slam.save_dir
+
 
         # filter incoming frames so that there is enough motion
         self.frontend_window = self.cfg['tracking']['frontend']['window']
@@ -41,7 +43,7 @@ class Tracker:
         prev_kf_idx = 0
         curr_kf_idx = 0
         prev_ba_idx = 0
-
+        stream = get_dataset(stream);
         intrinsic = stream.get_intrinsic()
         # for (timestamp, image, _, _) in tqdm(stream):
         for i in range(len(stream)):

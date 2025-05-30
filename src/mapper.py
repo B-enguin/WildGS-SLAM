@@ -89,6 +89,7 @@ class Mapper(object):
         self._set_hyperparams()
 
         # Set frame reader (where we get the input dataset)
+        self.config["data"]["stream_url"] = None
         self.frame_reader = get_dataset(self.config, device=self.device)
         self.intrinsics = as_intrinsics_matrix(self.frame_reader.get_intrinsic()).to(
             self.device
@@ -1591,6 +1592,10 @@ class Mapper(object):
         axs[0, 3].set_title("Uncertainty", fontsize=16)
         axs[1, 3].imshow(ssim_loss, cmap='jet', vmin=0, vmax=5)
         axs[1, 3].set_title("ssim_loss", fontsize=16)
+
+        cv2.imshow('gt', gt)
+        cv2.imshow('rendered', rendered_img)
+        cv2.waitKey(1)
         
         for i in range(2):
             for j in range(4):
