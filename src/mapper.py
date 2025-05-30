@@ -301,6 +301,8 @@ class Mapper(object):
                     gt=gt,
                     rendered=rendered_img,
                     uncertainty=colored_map if self.uncertainty_aware else None,
+                    splat=rendered_img,
+                    traj=viewpoint.world_view_transform
             ))
 
 

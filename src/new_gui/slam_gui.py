@@ -4,8 +4,6 @@ import dearpygui.dearpygui as dpg
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from evo.tools import plot
 from evo.core.trajectory import PoseTrajectory3D
-import time
-import cv2
 from multiprocessing import Queue
 from src.new_gui.gui_utils import MappingPacket
 
@@ -19,6 +17,8 @@ class GUI:
         self.q_map2vis = q_map2vis
         self.has_terminated = False
 
+        self.traj = []
+
         self.image_size = (dpg.get_viewport_width() // 3, dpg.get_viewport_height() // 2)
         self.traj_size = (dpg.get_viewport_width() // 2, dpg.get_viewport_height() // 2)
         self.splat_size = (dpg.get_viewport_width() // 2, dpg.get_viewport_height() // 2)
@@ -26,7 +26,7 @@ class GUI:
         self.gt = np.zeros((self.image_size[0],self.image_size[1], 4), dtype=np.float32)
         self.rendered = np.zeros((self.image_size[0], self.image_size[1], 4), dtype=np.float32)
         self.uncertainty = np.zeros((self.image_size[0], self.image_size[1], 4), dtype=np.float32)
-        self.traj = np.zeros((self.traj_size[0], self.traj_size[1], 4), dtype=np.float32)
+        self.traj_img = np.zeros((self.traj_size[0], self.traj_size[1], 4), dtype=np.float32)
         self.splat = np.zeros((self.splat_size[0], self.splat_size[1], 4), dtype=np.float32)
         with dpg.texture_registry():
             dpg.add_raw_texture(
@@ -39,7 +39,7 @@ class GUI:
                 self.image_size[0], self.image_size[1], self.uncertainty, format=dpg.mvFormat_Float_rgba, id="uncertainty"
             )
             dpg.add_raw_texture(
-                self.traj_size[0], self.traj_size[1], self.traj, format=dpg.mvFormat_Float_rgba, id="trajectory"
+                self.traj_size[0], self.traj_size[1], self.traj_img, format=dpg.mvFormat_Float_rgba, id="trajectory"
             )
             dpg.add_raw_texture(
                 self.splat_size[0], self.splat_size[1], self.splat, format=dpg.mvFormat_Float_rgba, id="splat"
@@ -60,6 +60,23 @@ class GUI:
         dpg.setup_dearpygui()
         dpg.show_viewport()
 
+    def update_traj(self, new_traj):
+        self.traj.append(new_traj)
+        
+        traj = PoseTrajectory3D(poses_se3=np.array(self.traj), timestamps=[0, 1])
+        fig = plt.figure(figsize=(self.traj_size[0] / 100, self.traj_size[1] / 100), dpi=100)
+        canvas = FigureCanvasAgg(fig)
+        plot_mode = plot.PlotMode.xyz
+        ax = plot.prepare_axis(fig, plot_mode)
+        plot.traj(ax, plot_mode, traj)
+        plot.draw_coordinate_axes(ax, traj, plot_mode, 0.5)
+        canvas.draw()
+        buf = canvas.buffer_rgba()
+        image = np.asarray(buf)
+        image = image.astype(np.float32) / 255
+
+        self.traj_img = image
+
     def update(self):
         if not self.q_map2vis.empty():
             data = self.q_map2vis.get()
@@ -67,8 +84,11 @@ class GUI:
                 self.gt = data.gt if data.gt is not None else self.gt
                 self.rendered = data.rendered if data.rendered is not None else self.rendered
                 self.uncertainty = data.uncertainty if data.uncertainty is not None else self.uncertainty
-                self.traj = data.traj if data.traj is not None else self.traj
                 self.splat = data.splat if data.splat is not None else self.splat
+
+                if data.traj is not None:
+                    self.update_traj(data.traj)
+
             elif isinstance(data, str) and data == "terminate":
                 self.has_terminated = True
 

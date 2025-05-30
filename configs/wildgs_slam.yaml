@@ -1,5 +1,5 @@
 verbose: True
-gui: False
+gui: True
 stride: 1            # use every X image from the dataset 
 max_frames: -1       # use the first X images from the dataset, -1 means using all
 setup_seed: 43
