@@ -44,7 +44,7 @@ from src.utils.camera_utils import Camera
 from src.utils.dyn_uncertainty import mapping_utils as map_utils
 from src.utils.dyn_uncertainty.median_filter import MedianPool2d
 from src.utils.plot_utils import create_gif_from_directory
-from src.gui import gui_utils
+from src.new_gui import gui_utils
 
 class Mapper(object):
     """
@@ -265,8 +265,8 @@ class Mapper(object):
                     self.map_opt_online(self.current_window, iters=1)
             torch.cuda.empty_cache()
 
-            if self.config['gui']:
-                self._send_to_gui(video_idx)
+            # if self.config['gui']:
+            #     self._send_to_gui(video_idx)
 
 
             viewpoint = self.cameras[video_idx]
@@ -292,13 +292,17 @@ class Mapper(object):
                 uncertainty_map = self.get_viewpoint_uncertainty_no_grad(viewpoint)
                 uncertainty_map = uncertainty_map.cpu().squeeze(0)
 
-            cv2.imshow('gt', gt)
-            cv2.imshow('rendered_img', rendered_img)
             # Convert to uint8 and apply colormap
             uncertainty_map_normalized = ((uncertainty_map.numpy() - 0) / 5 * 255).astype(np.uint8)
             colored_map = cv2.applyColorMap(uncertainty_map_normalized, cv2.COLORMAP_JET)
-            cv2.imshow('uncertainty_map', colored_map)
-            cv2.waitKey(1)
+
+            self.q_main2vis.put(
+                gui_utils.MappingPacket(
+                    gt=gt,
+                    rendered=rendered_img,
+                    uncertainty=colored_map if self.uncertainty_aware else None,
+            ))
+
 
             self.pipe.send("continue")
 
@@ -841,8 +845,8 @@ class Mapper(object):
         # Only keep the recent <self.window_size> number of keyframes in the window
         self.current_window = self.current_window[-self.window_size :]
 
-        if self.config['gui']:
-            self._send_to_gui(cur_video_idx)
+        # if self.config['gui']:
+        #     self._send_to_gui(cur_video_idx)
 
     def refine_pose_non_key_frame(
         self, frame_idx: int, w2c_init: torch.Tensor, features: torch.Tensor = None
@@ -1273,9 +1277,6 @@ class Mapper(object):
 
                 var = np.var(previous_losses)
 
-                with open("variance.txt", "a") as f:
-                    f.write(f"Iteration {cur_iter}, Variance: {var}\n")
-
                 if len(previous_losses) == self.config['early_stop']['window_size']:
                     if var < self.config['early_stop']['delta']:
                         self.printer.print(
@@ -1453,8 +1454,8 @@ class Mapper(object):
         if self.vis_uncertainty_online:
             self._vis_uncertainty_mask_all(is_final=True)
         
-        if self.config['gui']:
-            self._send_to_gui(self.current_window[np.array(self.current_window).argmax()])
+        # if self.config['gui']:
+        #     self._send_to_gui(self.current_window[np.array(self.current_window).argmax()])
 
         self.printer.print("Final refinement done", FontColor.MAPPER)
 
