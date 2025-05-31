@@ -46,6 +46,10 @@ from src.utils.dyn_uncertainty.median_filter import MedianPool2d
 from src.utils.plot_utils import create_gif_from_directory
 from src.new_gui import gui_utils
 
+import _pickle as pickle
+import copy
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+
 class Mapper(object):
     """
     Mapper thread.
@@ -139,6 +143,8 @@ class Mapper(object):
         self.q_main2vis = q_main2vis
         self.q_vis2main = q_vis2main
         self.pause = False
+
+        self.splat_viewpoint = None
 
     def run(self):
         """
@@ -267,7 +273,6 @@ class Mapper(object):
 
             # if self.config['gui']:
             #     self._send_to_gui(video_idx)
-
             if self.config['gui']:
                 with torch.no_grad():
                     viewpoint = self.cameras[video_idx]
@@ -278,9 +283,13 @@ class Mapper(object):
                         render_pkg["render"].detach(),
                         render_pkg["depth"].detach(),
                     )
-                    splat_viewpoint = self.cameras[0]
+                    if self.splat_viewpoint is None:
+                        self.splat_viewpoint = copy.deepcopy(self.cameras[0])
+                        self.splat_viewpoint.update_RT(
+                            self.splat_viewpoint.R, np.array([100, 100, 100])
+                        )
                     splat_pkg = render(
-                        viewpoint, self.gaussians, self.pipeline_params, self.background
+                        self.splat_viewpoint, self.gaussians, self.pipeline_params, self.background
                     )
                     (splat_img, _,) = (
                         splat_pkg["render"].detach(),
@@ -302,9 +311,17 @@ class Mapper(object):
                         uncertainty_map = self.get_viewpoint_uncertainty_no_grad(viewpoint)
                         uncertainty_map = uncertainty_map.cpu().squeeze(0)
 
-                    # Convert to uint8 and apply colormap
-                    uncertainty_map_normalized = ((uncertainty_map.numpy() - 0) / 5 * 255).astype(np.uint8)
-                    colored_map = cv2.applyColorMap(uncertainty_map_normalized, cv2.COLORMAP_JET)
+                        fig = plt.figure(figsize=(6.4, 4.8))
+                        ax = fig.add_subplot(111)
+                        canvas = FigureCanvasAgg(fig)
+                        ax.imshow(uncertainty_map, cmap='jet', vmin=0, vmax=5)
+                        ax.axis('off')
+                        ax.grid(False)
+                        canvas.draw()
+                        buf = canvas.buffer_rgba()
+                        colored_map = np.asarray(buf)
+                        colored_map = colored_map.astype(np.float32) / 255
+                        plt.close(fig)
 
                     self.q_main2vis.put(
                         gui_utils.MappingPacket(
@@ -312,9 +329,9 @@ class Mapper(object):
                             rendered=rendered_img,
                             uncertainty=colored_map if self.uncertainty_aware else None,
                             splat=splat_img,
-                            traj=viewpoint.world_view_transform
-                    ))
-
+                            traj=viewpoint.full_proj_transform.cpu().numpy(),
+                        )
+                    )
 
             self.pipe.send("continue")
 

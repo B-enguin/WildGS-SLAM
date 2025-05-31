@@ -6,7 +6,11 @@ class MappingPacket:
             gt = None,
             rendered = None,
             uncertainty = None,
+            splat=None,
+            traj=None,
     ):
         self.gt = gt
         self.rendered = rendered
         self.uncertainty = uncertainty
+        self.splat = splat
+        self.traj = traj

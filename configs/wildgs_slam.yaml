@@ -1,5 +1,5 @@
 verbose: True
-gui: True
+gui: False
 stride: 1            # use every X image from the dataset 
 max_frames: -1       # use the first X images from the dataset, -1 means using all
 setup_seed: 43
@@ -120,7 +120,7 @@ tracking:
     normalize: False    # whether to normalize disps after each BA iter
   uncertainty_params:
     activate: True
-  force_keyframe_every_n_frames: 15 # set to negative value if you don't want to force to insert keyframes
+  force_keyframe_every_n_frames: 9 # set to negative value if you don't want to force to insert keyframes
   nb_ref_frame_metric_depth_filtering: 6 # number of reference frames for filtering high uncertainty metric depth points
 
 cam:
@@ -156,7 +156,7 @@ data:
 dataset: 'tumrgbd'
 
 early_stop:
-  enabled: True
+  enabled: False
   window_size: 30
   patience: 25
   delta: 0.002
