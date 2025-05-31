@@ -268,42 +268,52 @@ class Mapper(object):
             # if self.config['gui']:
             #     self._send_to_gui(video_idx)
 
+            if self.config['gui']:
+                with torch.no_grad():
+                    viewpoint = self.cameras[video_idx]
+                    render_pkg = render(
+                        viewpoint, self.gaussians, self.pipeline_params, self.background
+                    )
+                    (rendered_img, _,) = (
+                        render_pkg["render"].detach(),
+                        render_pkg["depth"].detach(),
+                    )
+                    splat_viewpoint = self.cameras[0]
+                    splat_pkg = render(
+                        viewpoint, self.gaussians, self.pipeline_params, self.background
+                    )
+                    (splat_img, _,) = (
+                        splat_pkg["render"].detach(),
+                        splat_pkg["depth"].detach(),
+                    )
 
-            viewpoint = self.cameras[video_idx]
-            render_pkg = render(
-                viewpoint, self.gaussians, self.pipeline_params, self.background
-            )
-            (rendered_img, rendered_depth,) = (
-                render_pkg["render"].detach(),
-                render_pkg["depth"].detach(),
-            )
-            rendered_img = torch.clamp(rendered_img, 0.0, 1.0)
-            rendered_img = rendered_img.cpu().permute(1, 2, 0).numpy()
+                    rendered_img = torch.clamp(rendered_img, 0.0, 1.0)
+                    rendered_img = rendered_img.cpu().permute(1, 2, 0).numpy()
+                    rendered_img = cv2.cvtColor(rendered_img, cv2.COLOR_BGR2RGB)
+                    splat_img = torch.clamp(splat_img, 0.0, 1.0)
+                    splat_img = splat_img.cpu().permute(1, 2, 0).numpy()
+                    splat_img = cv2.cvtColor(splat_img, cv2.COLOR_BGR2RGB)
 
-            gt_image = viewpoint.original_image
+                    gt_image = viewpoint.original_image
+                    gt = (gt_image.cpu().numpy().transpose((1, 2, 0)) * 255).astype(np.uint8)
+                    gt = cv2.cvtColor(gt, cv2.COLOR_BGR2RGB)
+                    
+                    if self.uncertainty_aware:
+                        uncertainty_map = self.get_viewpoint_uncertainty_no_grad(viewpoint)
+                        uncertainty_map = uncertainty_map.cpu().squeeze(0)
 
-            gt = (gt_image.cpu().numpy().transpose((1, 2, 0)) * 255).astype(np.uint8)
-            gt = cv2.cvtColor(gt, cv2.COLOR_BGR2RGB)
-            rendered_img = cv2.cvtColor(rendered_img, cv2.COLOR_BGR2RGB)
+                    # Convert to uint8 and apply colormap
+                    uncertainty_map_normalized = ((uncertainty_map.numpy() - 0) / 5 * 255).astype(np.uint8)
+                    colored_map = cv2.applyColorMap(uncertainty_map_normalized, cv2.COLORMAP_JET)
 
-            if self.uncertainty_aware:
-                # Add plotting 2x4 grid with additional figures for uncertainty
-                # Estimated uncertainty map
-                uncertainty_map = self.get_viewpoint_uncertainty_no_grad(viewpoint)
-                uncertainty_map = uncertainty_map.cpu().squeeze(0)
-
-            # Convert to uint8 and apply colormap
-            uncertainty_map_normalized = ((uncertainty_map.numpy() - 0) / 5 * 255).astype(np.uint8)
-            colored_map = cv2.applyColorMap(uncertainty_map_normalized, cv2.COLORMAP_JET)
-
-            self.q_main2vis.put(
-                gui_utils.MappingPacket(
-                    gt=gt,
-                    rendered=rendered_img,
-                    uncertainty=colored_map if self.uncertainty_aware else None,
-                    splat=rendered_img,
-                    traj=viewpoint.world_view_transform
-            ))
+                    self.q_main2vis.put(
+                        gui_utils.MappingPacket(
+                            gt=gt,
+                            rendered=rendered_img,
+                            uncertainty=colored_map if self.uncertainty_aware else None,
+                            splat=splat_img,
+                            traj=viewpoint.world_view_transform
+                    ))
 
 
             self.pipe.send("continue")

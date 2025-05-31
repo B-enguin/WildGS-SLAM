@@ -6,19 +6,23 @@ from evo.tools import plot
 from evo.core.trajectory import PoseTrajectory3D
 from multiprocessing import Queue
 from src.new_gui.gui_utils import MappingPacket
+import time
 
 plt.switch_backend('agg')  # Use Agg backend for matplotlib
 
 class GUI:
     def __init__(self, q_map2vis: Queue):
         dpg.create_context()
-        dpg.create_viewport(title='WildGS-SLAM', width=1200, height=800)
+        dpg.create_viewport(title='WildGS-SLAM', width=1200, height=900)
 
         self.q_map2vis = q_map2vis
         self.has_terminated = False
 
         self.traj = []
+        self.previous_time = time.time()
+        self.frame_timestamps = []
 
+        self.metrics_size = (dpg.get_viewport_width(), 50)
         self.image_size = (dpg.get_viewport_width() // 3, dpg.get_viewport_height() // 2)
         self.traj_size = (dpg.get_viewport_width() // 2, dpg.get_viewport_height() // 2)
         self.splat_size = (dpg.get_viewport_width() // 2, dpg.get_viewport_height() // 2)
@@ -45,16 +49,22 @@ class GUI:
                 self.splat_size[0], self.splat_size[1], self.splat, format=dpg.mvFormat_Float_rgba, id="splat"
             )
 
-
-        with dpg.window(label="Ground Truth Images", width=self.image_size[0], height=self.image_size[1], pos=(0, 0)):
+        with dpg.window(label="Metrics", width=self.metrics_size[0], height=self.metrics_size[1], pos=(0, 0)):
+            with dpg.group(horizontal=True):
+                dpg.add_text("FPS:", )
+                dpg.add_text("0", tag="fps", color=(255, 0, 0, 255)) 
+                dpg.add_spacer(width=20) 
+                dpg.add_text("Time since last update:")
+                dpg.add_text("0.0", tag="last_update", color=(255, 0, 0, 255))   
+        with dpg.window(label="Ground Truth Images", width=self.image_size[0], height=self.image_size[1], pos=(0, self.metrics_size[1])):
             dpg.add_image("gt")
-        with dpg.window(label="Rendered Images", width=self.image_size[0], height=self.image_size[1], pos=(self.image_size[0], 0)):
+        with dpg.window(label="Rendered Images", width=self.image_size[0], height=self.image_size[1], pos=(self.image_size[0], self.metrics_size[1])):
             dpg.add_image("rendered")
-        with dpg.window(label="Uncertainty Images", width=self.image_size[0], height=self.image_size[1], pos=(self.image_size[0] * 2, 0)):
+        with dpg.window(label="Uncertainty Images", width=self.image_size[0], height=self.image_size[1], pos=(self.image_size[0] * 2, self.metrics_size[1])):
             dpg.add_image("uncertainty")
-        with dpg.window(label="Trajectory", width=self.traj_size[0], height=self.traj_size[1], pos=(0, self.image_size[1])):
+        with dpg.window(label="Trajectory", width=self.traj_size[0], height=self.traj_size[1], pos=(0, self.image_size[1]+self.metrics_size[1])):
             dpg.add_image("trajectory")
-        with dpg.window(label="Splat", width=self.splat_size[0], height=self.splat_size[1], pos=(self.traj_size[0], self.image_size[1])):
+        with dpg.window(label="Splat", width=self.splat_size[0], height=self.splat_size[1], pos=(self.traj_size[0], self.image_size[1]+self.metrics_size[1])):
             dpg.add_image("splat")
 
         dpg.setup_dearpygui()
@@ -81,6 +91,8 @@ class GUI:
         if not self.q_map2vis.empty():
             data = self.q_map2vis.get()
             if isinstance(data, MappingPacket):
+                dpg.set_value("last_update", f"{time.time() - self.previous_update_time:.2f}")
+                self.previous_update_time = time.time()
                 self.gt = data.gt if data.gt is not None else self.gt
                 self.rendered = data.rendered if data.rendered is not None else self.rendered
                 self.uncertainty = data.uncertainty if data.uncertainty is not None else self.uncertainty
@@ -89,6 +101,15 @@ class GUI:
                 if data.traj is not None:
                     self.update_traj(data.traj)
 
+                if data.gt is not None:
+                    self.frame_timestamps.append(time.time())
+                    if len(self.frame_timestamps) > 30:
+                        self.frame_timestamps.pop(0)
+                    if len(self.frame_timestamps) > 2:
+                        fps = 1 / np.diff(self.frame_timestamps).mean()
+                        dpg.set_value("fps", f"{fps:.2f}")
+
+
             elif isinstance(data, str) and data == "terminate":
                 self.has_terminated = True
 
@@ -96,7 +117,7 @@ class GUI:
         dpg.set_value("rendered", self.rendered)
         dpg.set_value("uncertainty", self.uncertainty)
         dpg.set_value("trajectory", self.traj)
-        dpg.set_value("splat", self.splat)
+        dpg.set_value("splat", self.splat)     
 
     def run(self):
         while dpg.is_dearpygui_running():
