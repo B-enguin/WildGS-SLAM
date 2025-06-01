@@ -487,8 +487,8 @@ class LiveStreamDataset(BaseDataset):
         frame = self.cap.read()
 
             
-        cv2.imshow('frame', frame)
-        cv2.waitKey(1)
+        # cv2.imshow('frame', frame)
+        # cv2.waitKey(1)
             
         # if (self.last_t - datetime.now()).total_seconds() < .5:
         #     time.sleep(0.5)

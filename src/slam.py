@@ -307,7 +307,7 @@ class SLAM:
             gui_process = mp.Process(target=slam_gui.run, args=(q_map2vis,))
             gui_process.start()
 
-            self.num_running_thread[0] += 1
+            # self.num_running_thread[0] += 1
 
 
         for p in processes:

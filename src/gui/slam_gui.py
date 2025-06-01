@@ -247,6 +247,45 @@ class SLAM_GUI:
 
         tabs.add_tab("Info", tab_info)
         self.panel.add_child(tabs)
+
+        self.panel.add_child(gui.Label("Splat Viewpoint Control"))
+        splat_tile = gui.Vert(0.5 * em, gui.Margins(margin))
+        
+        # X translation slider
+        x_slider_tile = gui.Horiz(0.5 * em, gui.Margins(margin))
+        x_slider_label = gui.Label("X Translation")
+        self.x_trans_slider = gui.Slider(gui.Slider.DOUBLE)
+        self.x_trans_slider.set_limits(-2.0, 2.0)
+        self.x_trans_slider.double_value = -0.4
+        self.x_trans_slider.set_on_value_changed(self._on_splat_trans_changed)
+        x_slider_tile.add_child(x_slider_label)
+        x_slider_tile.add_child(self.x_trans_slider)
+        splat_tile.add_child(x_slider_tile)
+        
+        # Y translation slider
+        y_slider_tile = gui.Horiz(0.5 * em, gui.Margins(margin))
+        y_slider_label = gui.Label("Y Translation")
+        self.y_trans_slider = gui.Slider(gui.Slider.DOUBLE)
+        self.y_trans_slider.set_limits(-2.0, 2.0)
+        self.y_trans_slider.double_value = -0.7
+        self.y_trans_slider.set_on_value_changed(self._on_splat_trans_changed)
+        y_slider_tile.add_child(y_slider_label)
+        y_slider_tile.add_child(self.y_trans_slider)
+        splat_tile.add_child(y_slider_tile)
+        
+        # Z translation slider
+        z_slider_tile = gui.Horiz(0.5 * em, gui.Margins(margin))
+        z_slider_label = gui.Label("Z Translation")
+        self.z_trans_slider = gui.Slider(gui.Slider.DOUBLE)
+        self.z_trans_slider.set_limits(0.0, 4.0)
+        self.z_trans_slider.double_value = 1.0
+        self.z_trans_slider.set_on_value_changed(self._on_splat_trans_changed)
+        z_slider_tile.add_child(z_slider_label)
+        z_slider_tile.add_child(self.z_trans_slider)
+        splat_tile.add_child(z_slider_tile)
+        
+        self.panel.add_child(splat_tile)
+
         self.window.add_child(self.panel)
 
     def init_glfw(self):
@@ -770,6 +809,17 @@ class SLAM_GUI:
                     self.step = 0
 
             gui.Application.instance.post_to_main_thread(self.window, update)
+
+    def _on_splat_trans_changed(self, value):
+        """Callback when splat translation sliders are changed"""
+        if self.gaussian_cur is not None and hasattr(self.gaussian_cur, 'splat_viewpoint'):
+            x = self.x_trans_slider.double_value
+            y = self.y_trans_slider.double_value
+            z = self.z_trans_slider.double_value
+            self.gaussian_cur.splat_viewpoint.update_RT(
+                self.gaussian_cur.splat_viewpoint.R,
+                torch.tensor([x, y, z], device=self.gaussian_cur.splat_viewpoint.R.device)
+            )
 
 
 def run(params_gui=None):
