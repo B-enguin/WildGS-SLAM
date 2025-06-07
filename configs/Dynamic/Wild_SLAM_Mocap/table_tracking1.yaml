@@ -2,7 +2,7 @@ inherit_from: ./configs/Dynamic/Wild_SLAM_Mocap/wild_slam_mocap.yaml
 scene: table_tracking1
 
 data:
-  input_folder: ROOT_FOLDER_PLACEHOLDER/scene1/table_tracking1
+  input_folder: /home/zihzhu/data/Datasets/WildSLAM/collected/table_tracking1
 
 cam: 
   fx: 647.9204711914062

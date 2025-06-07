@@ -2,7 +2,7 @@ inherit_from: ./configs/Dynamic/TUM_RGBD/tum_dynamic.yaml
 scene: freiburg3_walking_xyz
 
 data:
-  input_folder: ROOT_FOLDER_PLACEHOLDER/rgbd_dataset_freiburg3_walking_xyz
+  input_folder: /home/zihzhu/data/Datasets/TUM/rgbd_dataset_freiburg3_walking_xyz
 cam:  #intrinsic is different per scene in TUM, this cam does not have distortion
   H: 480 
   W: 640 
