@@ -1,0 +1,31 @@
+inherit_from: ./configs/wildgs_slam.yaml
+scene: rgb
+
+dataset: 'livestream'
+
+data:
+  root_folder: ./datasets/rgb
+  output: ./output/webcam
+  stream_url: "http://10.5.32.254:4747/video" # Replace with your webcam stream URL
+  
+cam:  #intrinsic is slightly different per seq
+  H: 360 
+  W: 640 
+  fx: 525
+  fy: 525
+  cx: 320
+  cy: 365.55963134765625
+  distortion: [-0.0550149604678154, 0.06560786068439484,-0.0005061274860054255,0.0004771310486830771,-0.021717390045523643]
+  H_out: 360
+  W_out: 640
+
+# cam:  #intrinsic is slightly different per seq
+#   H: 360 
+#   W: 640 
+#   fx: 275
+#   fy: 275
+#   cx: 204
+#   cy: 153
+#   distortion: [-0.0550149604678154, 0.06560786068439484,-0.0005061274860054255,0.0004771310486830771,-0.021717390045523643]
+#   H_out: 360
+#   W_out: 640
