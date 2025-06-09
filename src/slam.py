@@ -18,8 +18,8 @@ from src.mapper import Mapper
 from src.backend import Backend
 from src.utils.dyn_uncertainty.uncertainty_model import generate_uncertainty_mlp
 from src.utils.datasets import RGB_NoPose
-# from src.gui import gui_utils, slam_gui
-from src.new_gui import slam_gui
+from src.gui import gui_utils, slam_gui
+# from src.new_gui import slam_gui
 from thirdparty.gaussian_splatting.scene.gaussian_model import GaussianModel
 
 class SLAM:
@@ -271,41 +271,41 @@ class SLAM:
     def run(self):
         m_pipe, t_pipe = mp.Pipe()
 
-        # q_main2vis = mp.Queue() if self.cfg['gui'] else None
-        # q_vis2main = mp.Queue() if self.cfg['gui'] else None
+        q_main2vis = mp.Queue() if self.cfg['gui'] else None
+        q_vis2main = mp.Queue() if self.cfg['gui'] else None
 
-        q_map2vis = mp.Queue() if self.cfg['gui'] else None
+        # q_map2vis = mp.Queue() if self.cfg['gui'] else None
         # q_track2vis = mp.Queue() if self.cfg['gui'] else None
         
 
         processes = [
             mp.Process(target=self.tracking, args=(t_pipe,)),
-            mp.Process(target=self.mapping, args=(m_pipe,q_map2vis,None,)),
+            mp.Process(target=self.mapping, args=(m_pipe,q_main2vis,q_vis2main)),
         ]
         self.num_running_thread[0] += len(processes)
         for p in processes:
             p.start()
 
         if self.cfg['gui']:
-            # time.sleep(5)
-            # pipeline_params = munchify(self.cfg["mapping"]["pipeline_params"])
-            # bg_color = [0, 0, 0]
-            # background = torch.tensor(
-            #     bg_color, dtype=torch.float32, device=self.device
-            # )
-            # gaussians = GaussianModel(self.cfg['mapping']['model_params']['sh_degree'], config=self.cfg)
+            time.sleep(5)
+            pipeline_params = munchify(self.cfg["mapping"]["pipeline_params"])
+            bg_color = [0, 0, 0]
+            background = torch.tensor(
+                bg_color, dtype=torch.float32, device=self.device
+            )
+            gaussians = GaussianModel(self.cfg['mapping']['model_params']['sh_degree'], config=self.cfg)
 
-            # params_gui = gui_utils.ParamsGUI(
-            #     pipe=pipeline_params,
-            #     background=background,
-            #     gaussians=gaussians,
-            #     q_main2vis=q_main2vis,
-            #     q_vis2main=q_vis2main,
-            # )
-            # gui_process = mp.Process(target=slam_gui.run, args=(params_gui,))
-            # gui_process.start()
-            gui_process = mp.Process(target=slam_gui.run, args=(q_map2vis,))
+            params_gui = gui_utils.ParamsGUI(
+                pipe=pipeline_params,
+                background=background,
+                gaussians=gaussians,
+                q_main2vis=q_main2vis,
+                q_vis2main=q_vis2main,
+            )
+            gui_process = mp.Process(target=slam_gui.run, args=(params_gui,))
             gui_process.start()
+            # gui_process = mp.Process(target=slam_gui.run, args=(q_map2vis,))
+            # gui_process.start()
 
             # self.num_running_thread[0] += 1
 

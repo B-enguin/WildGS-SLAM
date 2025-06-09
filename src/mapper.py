@@ -44,7 +44,8 @@ from src.utils.camera_utils import Camera
 from src.utils.dyn_uncertainty import mapping_utils as map_utils
 from src.utils.dyn_uncertainty.median_filter import MedianPool2d
 from src.utils.plot_utils import create_gif_from_directory
-from src.new_gui import gui_utils
+from src.gui import gui_utils
+# from src.new_gui import gui_utils
 
 import _pickle as pickle
 import copy
@@ -161,18 +162,18 @@ class Mapper(object):
         self.pipe.send("continue")
 
         while True:
-            # if self.config['gui']:
-            #     if self.q_vis2main.empty():
-            #         if self.pause:
-            #             continue
-            #     else:
-            #         data_vis2main = self.q_vis2main.get()
-            #         self.pause = data_vis2main.flag_pause
-            #         if self.pause:
-            #             self.printer.print("You have paused the process", FontColor.MAPPER)
-            #             continue
-            #         else:
-            #             self.printer.print("You have resume the process", FontColor.MAPPER)
+            if self.config['gui']:
+                if self.q_vis2main.empty():
+                    if self.pause:
+                        continue
+                else:
+                    data_vis2main = self.q_vis2main.get()
+                    self.pause = data_vis2main.flag_pause
+                    if self.pause:
+                        self.printer.print("You have paused the process", FontColor.MAPPER)
+                        continue
+                    else:
+                        self.printer.print("You have resume the process", FontColor.MAPPER)
 
             frame_info = self.pipe.recv()
             frame_idx, video_idx = frame_info["timestamp"], frame_info["video_idx"]
@@ -271,70 +272,8 @@ class Mapper(object):
                     self.map_opt_online(self.current_window, iters=1)
             torch.cuda.empty_cache()
 
-            # if self.config['gui']:
-            #     self._send_to_gui(video_idx)
             if self.config['gui']:
-                with torch.no_grad():
-                    viewpoint = self.cameras[video_idx]
-                    render_pkg = render(
-                        viewpoint, self.gaussians, self.pipeline_params, self.background
-                    )
-                    (rendered_img, _,) = (
-                        render_pkg["render"].detach(),
-                        render_pkg["depth"].detach(),
-                    )
-                    if self.splat_viewpoint is None:
-                        self.splat_viewpoint = copy.deepcopy(self.cameras[0])
-                        self.splat_viewpoint.update_RT(
-                            self.splat_viewpoint.R,
-                            torch.tensor([-0.4, -0.7, 0.85])
-                        )
-                    splat_pkg = render(
-                        self.splat_viewpoint, self.gaussians, self.pipeline_params, self.background
-                    )
-                    (splat_img, _,) = (
-                        splat_pkg["render"].detach(),
-                        splat_pkg["depth"].detach(),
-                    )
-
-                    rendered_img = torch.clamp(rendered_img, 0.0, 1.0)
-                    rendered_img = rendered_img.cpu().permute(1, 2, 0).numpy()
-                    # rendered_img = cv2.cvtColor(rendered_img, cv2.COLOR_BGR2RGB)
-                    splat_img = torch.clamp(splat_img, 0.0, 1.0)
-                    splat_img = splat_img.cpu().permute(1, 2, 0).numpy()
-                    # splat_img = cv2.cvtColor(splat_img, cv2.COLOR_BGR2RGB)
-
-                    gt_image = viewpoint.original_image
-                    gt = (gt_image.cpu().numpy().transpose((1, 2, 0)) * 255).astype(np.uint8)
-                    # gt = cv2.cvtColor(gt, cv2.COLOR_BGR2RGB)
-                    
-                    if self.uncertainty_aware:
-                        uncertainty_map = self.get_viewpoint_uncertainty_no_grad(viewpoint)
-                        uncertainty_map = uncertainty_map.cpu().squeeze(0)
-
-                        fig = plt.figure(figsize=(6.4, 4.8))
-                        ax = fig.add_subplot(111)
-                        canvas = FigureCanvasAgg(fig)
-                        ax.imshow(uncertainty_map, cmap='jet', vmin=0, vmax=5)
-                        ax.axis('off')
-                        ax.grid(False)
-                        canvas.draw()
-                        buf = canvas.buffer_rgba()
-                        colored_map = np.asarray(buf)
-                        colored_map = colored_map.astype(np.float32) / 255
-                        plt.close(fig)
-
-                    self.q_main2vis.put(
-                        gui_utils.MappingPacket(
-                            gt=gt,
-                            rendered=rendered_img,
-                            uncertainty=colored_map if self.uncertainty_aware else None,
-                            splat=splat_img,
-                            # traj=viewpoint.full_proj_transform.cpu().numpy(),
-                            # traj=self.video.poses[video_idx].cpu().numpy(),
-                            traj=self.video.get_pose(video_idx, self.device).cpu().numpy(),
-                        )
-                    )
+                self._send_to_gui(video_idx)
 
             self.pipe.send("continue")
 
@@ -877,8 +816,8 @@ class Mapper(object):
         # Only keep the recent <self.window_size> number of keyframes in the window
         self.current_window = self.current_window[-self.window_size :]
 
-        # if self.config['gui']:
-        #     self._send_to_gui(cur_video_idx)
+        if self.config['gui']:
+            self._send_to_gui(cur_video_idx)
 
     def refine_pose_non_key_frame(
         self, frame_idx: int, w2c_init: torch.Tensor, features: torch.Tensor = None
@@ -1486,8 +1425,8 @@ class Mapper(object):
         if self.vis_uncertainty_online:
             self._vis_uncertainty_mask_all(is_final=True)
         
-        # if self.config['gui']:
-        #     self._send_to_gui(self.current_window[np.array(self.current_window).argmax()])
+        if self.config['gui']:
+            self._send_to_gui(self.current_window[np.array(self.current_window).argmax()])
 
         self.printer.print("Final refinement done", FontColor.MAPPER)
 
