@@ -1240,9 +1240,6 @@ class Mapper(object):
 
                 var = np.var(previous_losses)
 
-                with open("variance.txt", "a") as f:
-                    f.write(f"Iteration {cur_iter}, Variance: {var}\n")
-
                 if len(previous_losses) == self.config['early_stop']['window_size']:
                     if var < self.config['early_stop']['delta']:
                         self.printer.print(
