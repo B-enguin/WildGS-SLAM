@@ -172,6 +172,26 @@ python run.py  ./configs/Dynamic/TUM_RGBD/{config_file} #run a single sequence
 bash scripts_run/run_tum_dynamic_all.sh #run all dynamic sequences
 ```
 
+### Your own dataset
+1. Organize your image frames in the following structure:
+```yaml
+- {Path_to_your_data}
+  - rgb
+    - frame_00000.png
+    - frame_00001.png
+    - ...
+```
+
+2. Set up your config file using the template at: ``./configs/Custom/custom_template.yaml``. 
+Modify the path to your input_folder and change the scene name.
+Update the intrinsic parameters to match your dataset.
+
+3. Run WildGS-SLAM!
+```bash
+python run.py {Path_to_your_config}
+```
+
+
 ## Evaluation
 
 ### Camera poses

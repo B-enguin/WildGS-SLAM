@@ -132,7 +132,8 @@ class Frontend:
         self.t1 = self.video.counter.value
 
         # update mask
-        self.video.update_all_uncertainty_mask()
+        if self.cfg['tracking']["uncertainty_params"]['activate']:
+            self.video.update_all_uncertainty_mask()
 
         self.graph.add_proximity_factors(0, 0, rad=2, nms=2, thresh=self.frontend_thresh, remove=False)
 
@@ -167,7 +168,8 @@ class Frontend:
             
         # do update
         elif self.is_initialized and self.t1 < self.video.counter.value:
-            self.video.update_all_uncertainty_mask()
+            if self.cfg['tracking']["uncertainty_params"]['activate']:
+                self.video.update_all_uncertainty_mask()
             self.__update(force_to_add_keyframe)
             self.video.update_valid_depth_mask()
 

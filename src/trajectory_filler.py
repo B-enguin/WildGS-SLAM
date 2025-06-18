@@ -99,7 +99,9 @@ class PoseTrajectoryFiller:
 
         # store all camera poses
         pose_list = []
-        dino_feats = []
+        dino_feats = None
+        if self.uncertainty_aware:
+            dino_feats = []
 
         timestamps = []
         images = []
@@ -124,12 +126,14 @@ class PoseTrajectoryFiller:
 
             if len(timestamps) == 16:
                 pose_list += self.__fill(timestamps, images, None, intrinsics, dino_features)
-                dino_feats += dino_features
+                if dino_features is not None:
+                    dino_feats += dino_features 
                 timestamps, images, intrinsics, dino_features = [], [], [], []
 
         if len(timestamps) > 0:
             pose_list += self.__fill(timestamps, images, None, intrinsics, dino_features)
-            dino_feats += dino_features
+            if dino_features is not None:
+                dino_feats += dino_features
 
         # stitch pose segments together
         return lietorch.cat(pose_list, dim=0), dino_feats

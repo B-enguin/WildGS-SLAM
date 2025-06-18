@@ -41,7 +41,8 @@ class Backend:
     @torch.no_grad()
     def backend_ba(self, t_start, t_end, steps, graph, nms, radius, thresh, max_factors, t_start_loop=None, loop=False, motion_only=False, enable_wq=True):
         """ main update """
-        self.video.update_all_uncertainty_mask()
+        if self.cfg['tracking']["uncertainty_params"]['activate']:
+            self.video.update_all_uncertainty_mask()
         
         if t_start_loop is None or not loop:
             t_start_loop = t_start

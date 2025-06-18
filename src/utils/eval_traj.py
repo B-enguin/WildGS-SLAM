@@ -149,7 +149,10 @@ def full_traj_eval(traj_filler, mapper, plot_parent_dir, plot_name, stream, logg
         # refine non-keyframe-traj from the mapping
         # this is time-consuming with minimal tracking improvement
         for i in tqdm(range(traj_est.shape[0])):
-            img_feat = dino_feats[i]
+            if dino_feats is None:
+                img_feat = None
+            else:
+                img_feat = dino_feats[i]
             w2c_refined = mapper.refine_pose_non_key_frame(i,
                                                         torch.tensor(np.linalg.inv(traj_est[i])),
                                                         features=img_feat)

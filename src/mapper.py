@@ -837,7 +837,8 @@ class Mapper(object):
             "features": features,
         }
 
-        if self.uncertainty_aware:
+        # Using uncertainty only when uncertainty-aware tracking is activated
+        if self.video.uncertainty_aware:
             with torch.no_grad():
                 uncer = self.uncer_network(features.to(color.device))
                 uncer = torch.clip(uncer, min=0.1) + 1e-3
