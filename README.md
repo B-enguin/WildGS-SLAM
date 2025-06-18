@@ -10,7 +10,7 @@
     <strong>Wei Wang</strong>
 </p>
 
-<p align="center"> This project implements optimizations to improve the runtime performance of <a href="https://github.com/GradientSpaces/WildGS-SLAM">WildGS-SLAM</a>. We are able to obtain ~1.2x speedup on average while maintaining the tracking and novel view synthesis of the original in fast mode. The runtime of our project is compared against the original below.</p>
+<p align="center"> This project implements optimizations to improve the runtime performance of <a href="https://github.com/GradientSpaces/WildGS-SLAM">WildGS-SLAM</a>. We are able to obtain ~1.2x speedup on average while maintaining the tracking and novel view synthesis results of the original running in fast mode. The runtime of our project is compared against the original below.</p>
 
 <p align="center">
     <img src="./media/results.png" alt="results_image" width="100%">
