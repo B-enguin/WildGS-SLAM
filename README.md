@@ -1,23 +1,23 @@
 <p align="center">
-
-  <h1 align="center">WildGS-SLAM: Monocular Gaussian Splatting SLAM in Dynamic Environments</h1>
+  <h1 align="center">Real Time Deployment of WildGS-SLAM</h1>
   <p align="center">
-    <a href="https://jianhao-zheng.github.io/"><strong>Jianhao Zheng*</strong></a>
+    <strong>Benjamin Koh</strong>
     .
-    <a href="https://zzh2000.github.io"><strong>Zihan Zhu*</strong></a>
-    ·
-    <a href="https://www.linkedin.com/in/valentin-bieri-98426b207/?originalSubdomain=ch"><strong>Valentin Bieri</strong></a>
+    <strong>Marshall Poon</strong>
     .
-    <a href="https://people.inf.ethz.ch/pomarc/"><strong>Marc Pollefeys</strong></a>
-    ·
-    <a href="https://pengsongyou.github.io"><strong>Songyou Peng</strong></a>
-    ·
-    <a href="https://ir0.github.io/"><strong>Iro Armeni</strong></a>
+    <strong>Mikhail Razumovich</strong>
+    .
+    <strong>Wei Wang</strong>
 </p>
-<p align="center"> <strong>Computer Vision And Pattern Recognition (CVPR) 2025</strong></p>
-  <h3 align="center"><a href="https://arxiv.org/abs/2504.03886">Paper</a> | <a href="https://www.youtube.com/watch?v=xXuolzFvddQ">Video</a> | <a href="https://wildgs-slam.github.io/">Project Page</a></h3>
-  <div align="center"></div>
+
+<p align="center"> This project implements optimizations to improve the runtime performance of <a href="https://github.com/GradientSpaces/WildGS-SLAM">WildGS-SLAM</a>. We are able to obtain ~1.2x speedup on average while maintaining the tracking and novel view synthesis of the original in fast mode. The runtime of our project is compared against the original below.</p>
+
+<p align="center">
+    <img src="./media/results.png" alt="results_image" width="100%">
 </p>
+
+<p align="center"> For updated information or questions, please refer to the orignal project <a href="https://github.com/GradientSpaces/WildGS-SLAM">page</a></p>
+
 <p align="center">
     <img src="./media/teaser.png" alt="teaser_image" width="100%">
 </p>
@@ -26,9 +26,19 @@
 Given a monocular video sequence captured in the wild with dynamic distractors,
 WildGS-SLAM accurately tracks the camera trajectory and reconstructs a 3D Gaussian map for static elements, effectively removing all dynamic components. 
 </p>
+
+## Citation
+
+If you find the code useful, please cite the original authors
+```bibtex
+@inproceedings{Zheng2025WildGS,
+  author={Zheng, Jianhao and Zhu, Zihan and Bieri, Valentin and Pollefeys, Marc and Peng, Songyou and Armeni Iro},
+  title     = {WildGS-SLAM: Monocular Gaussian Splatting SLAM in Dynamic Environments},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2025}
+}
+```
 <br>
-
-
 
 <br>
 <!-- TABLE OF CONTENTS -->
@@ -49,12 +59,6 @@ WildGS-SLAM accurately tracks the camera trajectory and reconstructs a 3D Gaussi
     </li>
     <li>
       <a href="#acknowledgement">Acknowledgement</a>
-    </li>
-    <li>
-      <a href="#citation">Citation</a>
-    </li>
-    <li>
-      <a href="#contact">Contact</a>
     </li>
   </ol>
 </details>
@@ -84,7 +88,7 @@ pip3 install -U xformers==0.0.22.post7+cu118 --index-url https://download.pytorc
 5. Install the remaining dependencies.
 ```bash
 python -m pip install -e thirdparty/lietorch/
-python -m pip install -e thirdparty/diff-gaussian-rasterization-w-pose/
+python -m pip install -e thirdparty/diff-gaussian-rasterization-accel-pose/
 python -m pip install -e thirdparty/simple-knn/
 ```
 6. Check installation.
@@ -182,19 +186,4 @@ python scripts_run/summarize_pose_eval.py
 Only support for Wild-SLAM Mocap dataset. (Todo: this needs some time to be released)
 
 ## Acknowledgement
-We adapted some codes from some awesome repositories including [MonoGS](https://github.com/muskie82/MonoGS), [DROID-SLAM](https://github.com/princeton-vl/DROID-SLAM), [Splat-SLAM](https://github.com/google-research/Splat-SLAM), [GIORIE-SLAM](https://github.com/zhangganlin/GlORIE-SLAM), [nerf-on-the-go](https://github.com/cvg/nerf-on-the-go) and [Metric3D V2](https://github.com/YvanYin/Metric3D). Thanks for making codes publicly available. 
-
-## Citation
-
-If you find our code or paper useful, please cite
-```bibtex
-@inproceedings{Zheng2025WildGS,
-  author={Zheng, Jianhao and Zhu, Zihan and Bieri, Valentin and Pollefeys, Marc and Peng, Songyou and Armeni Iro},
-  title     = {WildGS-SLAM: Monocular Gaussian Splatting SLAM in Dynamic Environments},
-  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
-  year      = {2025}
-}
-```
-
-## Contact
-Contact [Jianhao Zheng](mailto:jianhao@stanford.edu) for questions, comments and reporting bugs.
+We adapted some codes from some awesome repositories including [MonoGS](https://github.com/muskie82/MonoGS), [DROID-SLAM](https://github.com/princeton-vl/DROID-SLAM), [Splat-SLAM](https://github.com/google-research/Splat-SLAM), [GIORIE-SLAM](https://github.com/zhangganlin/GlORIE-SLAM), [nerf-on-the-go](https://github.com/cvg/nerf-on-the-go), [Metric3D V2](https://github.com/YvanYin/Metric3D), [Fused-SSIM](https://github.com/rahul-goel/fused-ssim) and [Taming 3DGS](https://github.com/humansensinglab/taming-3dgs). Thanks for making codes publicly available. 
