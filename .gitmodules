@@ -15,4 +15,4 @@
 	url = git@github.com:ywyue/FiT3D.git
 [submodule "thirdparty/diff-gaussian-rasterization-accel-pose"]
 	path = thirdparty/diff-gaussian-rasterization-accel-pose
-	url = git@github.com:B-enguin/diff-gaussian-rasterization-accel-pose.git
+	url = https://github.com/B-enguin/diff-gaussian-rasterization-accel-pose.git
